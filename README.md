@@ -1,2 +1,3 @@
-# rpk
-Resoure packer
+# btr
+
+Build Task Runner utility

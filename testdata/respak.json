@@ -1,0 +1,16 @@
+{
+    "version": "1.0.0",
+    "tasks": [
+        {
+            "label": "Make SVG font",
+            "type": "svgfont",
+            "source": "./icons/*.svg",
+            "target": "./icons.svg",
+            "font": {
+                "firstCodepoint": "U+F000",
+                "height": 512,
+                "descent": 128
+            }
+        }
+    ]
+}
