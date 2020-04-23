@@ -2,6 +2,8 @@ package tasks
 
 import (
 	"path/filepath"
+
+	"github.com/adnsv/btr/codegen"
 )
 
 // Task contains a description and all the parameters required for execution of
@@ -12,7 +14,21 @@ type Task struct {
 	Source  string      `json:"source"`
 	Sources []string    `json:"sources"`
 	Target  string      `json:"target"`
+	Targets []string    `json:"targets"`
 	Font    *FontConfig `json:"font"`
+	Codegen TaskCodegen `json:"codegen"`
+	Format  string      `json:"format"`
+}
+
+type TaskCodegen struct {
+	Namespace    string         `json:"namespace"`
+	TypeName     *string        `json:"typename"`
+	ValuePrefix  string         `json:"value.prefix"`
+	ValuePostfix string         `json:"value.postfix"`
+	IdentPrefix  string         `json:"ident.prefix"`
+	IdentPostfix string         `json:"ident.postfix"`
+	TopMatter    codegen.Matter `json:"top-matter"`
+	BottomMatter codegen.Matter `json:"bottom-matter"`
 }
 
 // GetSources combines Source and Sources into a single list

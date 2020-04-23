@@ -1,6 +1,7 @@
 <svg xmlns='http://www.w3.org/2000/svg'>
-	<defs>
-	<font id="icons" horiz-adv-x="512">
+<!-- DO NOT EDIT: Generated file -->
+<defs>
+<font id="icons" horiz-adv-x="512">
 	<font-face
 		font-family="icons"
 		font-weight="400"
@@ -69,6 +70,6 @@
 		unicode="&#xf00b;"
 		d="M469,-21L43,-21L43,64L469,64L469,-21zM405,256L363,299L256,192L149,299L107,256L256,107L405,256z"
 		horiz-adv-x="512" />
-	</font>
-	</defs>
-	</svg>
+</font>
+</defs>
+</svg>

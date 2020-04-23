@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/adnsv/rpk/tasks"
+	"github.com/adnsv/btr/codegen"
+
+	"github.com/adnsv/btr/tasks"
 	cli "github.com/jawher/mow.cli"
 )
 
@@ -33,6 +35,18 @@ func main() {
 			fmt.Printf("Configuration loaded\n")
 		}
 		if config != nil {
+			if config.Codegen == nil {
+				config.Codegen = &codegen.Config{}
+			}
+			config.Codegen.OnBeforeWrite = func(path string) {
+				fmt.Printf("writing %q", path)
+			}
+			config.Codegen.OnWriteSucceded = func(path string) {
+				fmt.Print(" ... DONE\n")
+			}
+			config.Codegen.OnWriteFailed = func(path string, err error) {
+				fmt.Print(" ... FAILED\n")
+			}
 			err = config.Run()
 			if err != nil {
 				log.Fatal(err)

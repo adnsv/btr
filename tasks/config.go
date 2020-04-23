@@ -6,13 +6,16 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+
+	"github.com/adnsv/btr/codegen"
 )
 
 type Config struct {
-	BaseDir string  `json:"-"`
-	Verbose bool    `json:"-"`
-	Version string  `json:"version"`
-	Tasks   []*Task `json:"tasks"`
+	BaseDir string          `json:"-"`
+	Verbose bool            `json:"-"`
+	Version string          `json:"version"`
+	Codegen *codegen.Config `json:"codegen"`
+	Tasks   []*Task         `json:"tasks"`
 }
 
 func LoadConfig(fn string) (*Config, error) {
@@ -57,12 +60,20 @@ func (c *Config) RunTask(t *Task) error {
 		return nil
 	}
 	if c.Verbose {
-		fmt.Printf(" - type: %s\n", t.Type)
+		fmt.Printf("task type: %s\n", t.Type)
 	}
 
 	switch t.Type {
-	case "svgfont":
-		return RunSVGFont(t, c.BaseDir, c.Verbose)
+	case "svgfont.make":
+		return RunSVGFontMake(t, c)
+	case "svgfont.hpp":
+		return RunSVGFontHPP(t, c)
+	case "svgfont.ttf":
+		return RunSVGFontTTF(t, c)
+	case "binpack.c++":
+		return RunBinPackCPP(t, c)
+	case "imgpack.c++":
+		return RunImgPackCPP(t, c)
 	default:
 		log.Printf("unsupported task type '%s'", t.Type)
 	}

@@ -1,0 +1,103 @@
+{
+    "version": "1.0.0",
+    "codegen": {
+        "top-matter": {
+            "svg": [
+                "<svg xmlns='http://www.w3.org/2000/svg'>",
+                "<!-- DO NOT EDIT: Generated file -->"
+            ],
+            "hpp": [
+                "#pragma once",
+                "",
+                "// DO NOT EDIT: Generated file",
+                "// clang-format off",
+                ""
+            ],
+            "cpp": [
+                "// DO NOT EDIT: Generated file",
+                "// clang-format off",
+                ""
+            ]
+        },
+        "bottom-matter": {
+            "svg": [
+                "</svg>"
+            ]
+        }
+    },
+    "tasks": [
+        {
+            "label": "Make SVG font",
+            "type": "svgfont.make",
+            "source": "./icons/*.svg",
+            "target": "./icons.svg",
+            "font": {
+                "firstCodepoint": "U+F000",
+                "height": 512,
+                "descent": 128
+            }
+        },
+        {
+            "label": "Make C++ header for SVG font",
+            "type": "svgfont.hpp",
+            "source": "./icons.svg",
+            "target": "./icons.hpp",
+            "codegen": {
+                "namespace": "icon",
+                "typename": "constexpr char const*"
+            }
+        },
+        {
+            "label": "Convert SVG font to TTF",
+            "type": "svgfont.ttf",
+            "source": "./icons.svg",
+            "target": "./icons.ttf"
+        },
+        {
+            "label": "Generate C++ binary resource for TTF font",
+            "type": "binpack.c++",
+            "source": "./icons.ttf",
+            "targets": [
+                "./icon-resource.hpp",
+                "./icon-resource.cpp"
+            ],
+            "codegen": {
+                "namespace": "app::resource",
+                "typename": "byte",
+                "top-matter": {
+                    "hpp": [
+                        "#include <array>",
+                        ""
+                    ],
+                    "cpp": [
+                        "#include \"icon-resource.hpp\"",
+                        ""
+                    ]
+                }
+            }
+        },
+        {
+            "label": "Pack app-icon images into a C++ binary resource for GLFW",
+            "type": "imgpack.c++",
+            "source": "./app-icon/algo-icon-*.png",
+            "targets": [
+                "./app-icon-resource.hpp",
+                "./app-icon-resource.cpp"
+            ],
+            "format": "nrgba",
+            "codegen": {
+                "namespace": "app::resource",
+                "top-matter": {
+                    "hpp": [
+                        "#include <array>",
+                        ""
+                    ],
+                    "cpp": [
+                        "#include \"app-icon-resource.hpp\"",
+                        ""
+                    ]
+                }
+            }
+        }
+    ]
+}
