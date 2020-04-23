@@ -103,11 +103,14 @@ func RunImgPackCPP(task *Task, config *Config) error {
 			return err
 		}
 	}
+	hpath = filepath.Clean(hpath)
+	cpath = filepath.Clean(cpath)
+
 	sources := task.GetSources()
 	if len(sources) == 0 {
-		return errors.New("missing sources paths\nspecify \"source\": \"path\": \"path\" or \"sources\": [\"path\",...] in the task description")
+		return errors.New("missing sources paths\nspecify \"source\": \"path\" or \"sources\": [\"path\",...] in the task description")
 	}
-	filepaths, err := ObtainFilePaths(config.BaseDir, sources)
+	filepaths, err := AbsExistingPaths(config.BaseDir, sources)
 	if err != nil {
 		return err
 	}
@@ -169,7 +172,7 @@ func RunImgPackCPP(task *Task, config *Config) error {
 	for _, img := range images {
 		hpp.Printf("// %s image resource\n", img.name)
 		hpp.Printf("// %d x %d, %s, %d bytes\n", img.width, img.height, img.frmt, len(img.data))
-		hpp.Printf("extern const %s %s;\n", typename, img.name)
+		hpp.Printf("extern %s const& %s;\n", typename, img.name)
 	}
 
 	cpp.Print("namespace { // hidden\n")
@@ -191,7 +194,7 @@ func RunImgPackCPP(task *Task, config *Config) error {
 	}
 	cpp.Print("\n} // image_data__ namespace \n\n")
 
-	cpp.Printf("const std::array<%s const, %d> image_catalog__ = {", typename, len(images))
+	cpp.Printf("std::array<%s const, %d> const image_catalog__ = {", typename, len(images))
 	for _, img := range images {
 		cpp.Printf("\n\t%s{%q, %q, %d, %d, {image_data__::%s.data(), image_data__::%s.size()} },",
 			typename, img.name, img.frmt, img.width, img.height, img.name, img.name)
@@ -200,7 +203,7 @@ func RunImgPackCPP(task *Task, config *Config) error {
 	cpp.Print("} // hidden namespace\n\n")
 
 	for i, img := range images {
-		cpp.Printf("const %s const& %s = image_catalog__[%d];\n",
+		cpp.Printf("%s const& %s = image_catalog__[%d];\n",
 			typename, img.name, i)
 	}
 

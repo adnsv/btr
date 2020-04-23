@@ -69,22 +69,22 @@ func RunSVGFontMake(task *Task, config *Config) error {
 
 	sources := task.GetSources()
 	if len(sources) == 0 {
-		return errors.New("missing sources paths\nspecify \"source\": \"path\": \"path\" or \"sources\": [\"path\",...] in the task description")
+		return errors.New("missing sources paths\nspecify \"source\": \"path\" or \"sources\": [\"path\",...] in the task description")
 	}
-	filepaths, err := ObtainFilePaths(config.BaseDir, sources)
+	sourcepaths, err := AbsExistingPaths(config.BaseDir, sources)
 	if err != nil {
 		return err
 	}
 	glyphs := []*Glyph{}
 
 	maxPathLength := 0
-	for _, fn := range filepaths {
+	for _, fn := range sourcepaths {
 		if len(fn) > maxPathLength {
 			maxPathLength = len(fn)
 		}
 	}
 
-	for _, fn := range filepaths {
+	for _, fn := range sourcepaths {
 		gname := RemoveExtension(filepath.Base(fn))
 		gname = MakeIdentStr(gname)
 

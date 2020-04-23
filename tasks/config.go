@@ -76,6 +76,10 @@ func (c *Config) RunTask(t *Task) error {
 		return RunImgPackCPP(t, c)
 	case "imgpack.c++.types":
 		return RunImgPackCPPTypes(t, c)
+	case "dir.make":
+		return RunDir(t, c, "make")
+	case "dir.clean":
+		return RunDir(t, c, "clean")
 	default:
 		log.Printf("unsupported task type '%s'", t.Type)
 	}

@@ -12,13 +12,22 @@ import (
 	cli "github.com/jawher/mow.cli"
 )
 
+var appname = "btr"
+var appver = "0.1"
+
 func main() {
-	app := cli.App("rpk", "Resource packer utility")
+	app := cli.App(appname, "Resource packer utility")
 	app.Spec = "[-v] FILENAME"
 	fn := app.StringArg("FILENAME", "", "A JSON file with packer steps")
 	verbose := app.BoolOpt("v verbose", false, "Show verbose output")
+	version := app.BoolOpt("version", false, "Display version number")
 	app.Action = func() {
 		cwd, _ := os.Getwd()
+
+		if *version {
+			fmt.Printf("%s %s\n", appname, appver)
+			return
+		}
 
 		absfn, _ := filepath.Abs(*fn)
 		fmt.Printf("Running config: %s\n", absfn)
@@ -52,7 +61,7 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		fmt.Print("\nmission Accomplished\n")
+		fmt.Print("\nmission accomplished\n")
 	}
 	app.Run(os.Args)
 }

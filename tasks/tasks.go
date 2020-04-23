@@ -41,24 +41,62 @@ func (t *Task) GetSources() []string {
 	return ret
 }
 
-// ObtainFilePaths gets all the actual filepaths from sources, processes
-// wildcards and expands all paths relative to basedir
-func ObtainFilePaths(basedir string, sources []string) ([]string, error) {
+// GetTargets combines Source and Sources into a single list
+func (t *Task) GetTargets() []string {
 	ret := []string{}
-	for _, src := range sources {
-		if !filepath.IsAbs(src) {
-			src = filepath.Join(basedir, src)
+	if len(t.Target) > 0 {
+		ret = append(ret, t.Target)
+	}
+	for _, t := range t.Targets {
+		if len(t) > 0 {
+			ret = append(ret, t)
 		}
-		src, err := filepath.Abs(src)
-		if err != nil {
-			return nil, err
+	}
+	return ret
+}
+
+// AbsExistingPaths gets all the actual filepaths from sources, processes
+// wildcards and expands all paths relative to basedir
+// returns paths only for existing filesystem entries
+func AbsExistingPaths(basedir string, paths []string) ([]string, error) {
+	var err error
+	ret := []string{}
+	for _, it := range paths {
+		path := it
+		if !filepath.IsAbs(path) {
+			path, err = filepath.Abs(filepath.Join(basedir, it))
+			if err != nil {
+				return nil, err
+			}
 		}
-		matches, err := filepath.Glob(src)
+		path = filepath.Clean(path)
+		matches, err := filepath.Glob(path)
 		if err != nil {
 			return nil, err
 		}
 		for _, fn := range matches {
-			ret = append(ret, fn)
+			ret = append(ret, filepath.Clean(fn))
+		}
+	}
+	return ret, nil
+}
+
+// AbsPaths converts paths to absolute paths
+// non-absolute paths are expanded relative to basedir
+func AbsPaths(basedir string, paths []string) ([]string, error) {
+	var err error
+	ret := []string{}
+	for _, it := range paths {
+		path := it
+		if !filepath.IsAbs(path) {
+			path, err = filepath.Abs(filepath.Join(basedir, it))
+			if err != nil {
+				return nil, err
+			}
+		}
+		path = filepath.Clean(path)
+		if len(path) > 0 {
+			ret = append(ret, path)
 		}
 	}
 	return ret, nil

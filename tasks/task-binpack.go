@@ -32,11 +32,14 @@ func RunBinPackCPP(task *Task, config *Config) error {
 			return err
 		}
 	}
+	hpath = filepath.Clean(hpath)
+	cpath = filepath.Clean(cpath)
+
 	sources := task.GetSources()
 	if len(sources) == 0 {
-		return errors.New("missing sources paths\nspecify \"source\": \"path\": \"path\" or \"sources\": [\"path\",...] in the task description")
+		return errors.New("missing source paths\nspecify \"source\": \"path\" or \"sources\": [\"path\",...] in the task description")
 	}
-	filepaths, err := ObtainFilePaths(config.BaseDir, sources)
+	filepaths, err := AbsExistingPaths(config.BaseDir, sources)
 	if err != nil {
 		return err
 	}
