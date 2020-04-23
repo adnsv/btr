@@ -74,6 +74,8 @@ func (c *Config) RunTask(t *Task) error {
 		return RunBinPackCPP(t, c)
 	case "imgpack.c++":
 		return RunImgPackCPP(t, c)
+	case "imgpack.c++.types":
+		return RunImgPackCPPTypes(t, c)
 	default:
 		log.Printf("unsupported task type '%s'", t.Type)
 	}

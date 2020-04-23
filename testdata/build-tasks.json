@@ -77,9 +77,31 @@
             }
         },
         {
+            "label": "Generate C++ image resource type header",
+            "type": "imgpack.c++.types",
+            "target": "./img-types.hpp",
+            "codegen": {
+                "namespace": "app::resource",
+                "typename": "image",
+                "top-matter": {
+                    "hpp": [
+                        "#include <cstddef>",
+                        "#include <string_view>",
+                        ""
+                    ]
+                }
+            }
+        },
+        {
             "label": "Pack app-icon images into a C++ binary resource for GLFW",
             "type": "imgpack.c++",
-            "source": "./app-icon/algo-icon-*.png",
+            "sources": [
+                "./app-icon/algo-icon-16.png",
+                "./app-icon/algo-icon-24.png",
+                "./app-icon/algo-icon-32.png",
+                "./app-icon/algo-icon-48.png",
+                "./app-icon/algo-icon-64.png"
+            ],
             "targets": [
                 "./app-icon-resource.hpp",
                 "./app-icon-resource.cpp"
@@ -87,9 +109,11 @@
             "format": "nrgba",
             "codegen": {
                 "namespace": "app::resource",
+                "typename": "resource::image",
                 "top-matter": {
                     "hpp": [
                         "#include <array>",
+                        "#include \"./img-types.hpp\"",
                         ""
                     ],
                     "cpp": [

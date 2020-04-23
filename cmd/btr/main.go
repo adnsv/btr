@@ -52,7 +52,7 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		fmt.Printf("Mission Accomplished\n")
+		fmt.Print("\nmission Accomplished\n")
 	}
 	app.Run(os.Args)
 }

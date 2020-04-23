@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -75,16 +76,36 @@ func RunSVGFontMake(task *Task, config *Config) error {
 		return err
 	}
 	glyphs := []*Glyph{}
+
+	maxPathLength := 0
 	for _, fn := range filepaths {
+		if len(fn) > maxPathLength {
+			maxPathLength = len(fn)
+		}
+	}
+
+	for _, fn := range filepaths {
+		gname := RemoveExtension(filepath.Base(fn))
+		gname = MakeIdentStr(gname)
+
 		if config.Verbose {
-			fmt.Printf("loading %q\n", fn)
+			n := maxPathLength - len(fn) + 1
+			if n < 1 {
+				n = 1
+			}
+			fmt.Printf("loading %q%s-> %s\n", fn, strings.Repeat(" ", n), gname)
 		}
 		g, err := readGlyph(fn)
 		if err != nil {
 			return err
 		}
+		g.Name = gname
 		glyphs = append(glyphs, g)
 	}
+
+	sort.SliceStable(glyphs, func(i, j int) bool {
+		return strings.Compare(glyphs[i].Name, glyphs[j].Name) < 0
+	})
 
 	// assign codepoints
 	for _, g := range glyphs {
@@ -102,15 +123,15 @@ func RunSVGFontMake(task *Task, config *Config) error {
 	}
 
 	ascent := height - descent
-	name := task.Font.Family
-	if name == "" {
-		name = filepath.Base(dst)
-		name = name[:len(name)-len(filepath.Ext(name))]
+	familyname := task.Font.Family
+	if familyname == "" {
+		familyname = filepath.Base(dst)
+		familyname = familyname[:len(familyname)-len(filepath.Ext(familyname))]
 	}
 	svg := codegen.NewBuffer(dst, config.Codegen)
 	svg.WriteLines(config.Codegen.TopMatter.Lines("svg")...)
 	svg.WriteLines(task.Codegen.TopMatter.Lines("svg")...)
-	err = makeSVGFont(svg, glyphs, ascent, descent, name)
+	err = makeSVGFont(svg, glyphs, ascent, descent, familyname)
 	if err != nil {
 		return err
 	}
@@ -120,7 +141,8 @@ func RunSVGFontMake(task *Task, config *Config) error {
 }
 
 type Glyph struct {
-	FileName  string
+	FilePath  string
+	Name      string
 	CodePoint rune
 	Width     float64
 	Height    float64
@@ -152,7 +174,7 @@ func readGlyph(fn string) (*Glyph, error) {
 		return nil, fmt.Errorf("Does not have path element")
 	}
 
-	g.FileName = fn
+	g.FilePath = fn
 	g.Width = sg.Width.Value
 	g.Height = sg.Height.Value
 	g.Path = path.D
@@ -199,10 +221,6 @@ func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
 		}
 		adv := int(math.Round(g.Width * scale))
 
-		name := filepath.Base(g.FileName)
-		ext := filepath.Ext(name)
-		name = name[:len(name)-len(ext)]
-
 		pds := pd.String()
 		out.Printf(`
 	<glyph
@@ -210,7 +228,7 @@ func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
 		unicode="&#x%x;"
 		d="%s"
 		horiz-adv-x="%d" />`,
-			name, g.CodePoint, pds, adv)
+			g.Name, g.CodePoint, pds, adv)
 	}
 
 	out.Print("\n</font>\n</defs>\n")
@@ -330,10 +348,12 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 			escaped += fmt.Sprintf(`\x%x`, u8[i])
 		}
 		hex := fmt.Sprintf("%X", cp)
-		ident := makeIdent(g.Name)
-
+		ident := MakeIdentStr(g.Name)
 		fmt.Fprintf(tw, "%s%s%s%s\t= %s\"%s\"%s;\t// U+%s %s\n",
-			typestr, cg.IdentPrefix, ident, cg.IdentPostfix, cg.ValuePrefix, escaped, cg.ValuePostfix, hex, g.Name,
+			typestr, cg.IdentPrefix, ident,
+			cg.IdentPostfix, cg.ValuePrefix,
+			escaped,
+			cg.ValuePostfix, hex, g.Name,
 		)
 	}
 	tw.Flush()
@@ -342,21 +362,6 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 	out.WriteBottomMatter()
 
 	return nil
-}
-
-func makeIdent(s string) string {
-	s = strings.ReplaceAll(s, "-", "_")
-	if s == "" {
-		return "_"
-	}
-	if !identStart(s[0]) {
-		s = "_" + s
-	}
-	return s
-}
-
-func identStart(c byte) bool {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
 }
 
 func RunSVGFontTTF(task *Task, config *Config) error {
@@ -409,3 +414,75 @@ func RunSVGFontTTF(task *Task, config *Config) error {
 
 	return nil
 }
+
+func RemoveExtension(fn string) string {
+	ext := filepath.Ext(fn)
+	return fn[:len(fn)-len(ext)]
+}
+
+func MakeIdentStr(s string) string {
+	s = strings.ReplaceAll(s, "-", "_")
+	if s == "" {
+		return "_"
+	}
+	if !identStart(s[0]) {
+		s = "_" + s
+	}
+	for _, kw := range reservedKeywords {
+		if s == kw {
+			s += "_"
+			break
+		}
+	}
+	return s
+}
+
+func identStart(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
+}
+
+var reservedKeywords = [...]string{
+	"auto",
+	"break",
+	"case",
+	"char",
+	"const",
+	"continue",
+	"default",
+	"do",
+	"double",
+	"else",
+	"enum",
+	"extern",
+	"float",
+	"for",
+	"goto",
+	"if",
+	"inline",
+	"int",
+	"long",
+	"register",
+	"restrict",
+	"return",
+	"short",
+	"signed",
+	"sizeof",
+	"static",
+	"struct",
+	"switch",
+	"typedef",
+	"union",
+	"unsigned",
+	"void",
+	"volatile",
+	"while",
+	"_Alignas ",
+	"_Alignof",
+	"_Atomic",
+	"_Bool",
+	"_Complex ",
+	"_Generic",
+	"_Imaginary",
+	"_Noreturn",
+	"_Static_assert",
+	"_Thread_local"}
