@@ -1067,7 +1067,7 @@ const std::array<unsigned char const, 16384> algo_icon_64 = {
 
 } // image_data__ namespace 
 
-const std::array<resource::image const, 5> image_catalog__ = {
+std::array<resource::image const, 5> const image_catalog__ = {
 	resource::image{"algo_icon_16", "nrgba", 16, 16, {image_data__::algo_icon_16.data(), image_data__::algo_icon_16.size()} },
 	resource::image{"algo_icon_24", "nrgba", 24, 24, {image_data__::algo_icon_24.data(), image_data__::algo_icon_24.size()} },
 	resource::image{"algo_icon_32", "nrgba", 32, 32, {image_data__::algo_icon_32.data(), image_data__::algo_icon_32.size()} },
@@ -1077,11 +1077,11 @@ const std::array<resource::image const, 5> image_catalog__ = {
 
 } // hidden namespace
 
-const resource::image const& algo_icon_16 = image_catalog__[0];
-const resource::image const& algo_icon_24 = image_catalog__[1];
-const resource::image const& algo_icon_32 = image_catalog__[2];
-const resource::image const& algo_icon_48 = image_catalog__[3];
-const resource::image const& algo_icon_64 = image_catalog__[4];
+resource::image const& algo_icon_16 = image_catalog__[0];
+resource::image const& algo_icon_24 = image_catalog__[1];
+resource::image const& algo_icon_32 = image_catalog__[2];
+resource::image const& algo_icon_48 = image_catalog__[3];
+resource::image const& algo_icon_64 = image_catalog__[4];
 
 auto find_image(std::string_view name) -> resource::image const* {
 	for (auto const& it : image_catalog__)

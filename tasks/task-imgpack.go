@@ -70,6 +70,16 @@ func loadImage(path string, name string, wantFormat string) (*imageEntry, error)
 			binary = []byte(conv.Pix)
 			frmt = "nrgba"
 		}
+	case "png":
+		{
+			buf := &bytes.Buffer{}
+			err = png.Encode(buf, img)
+			if err != nil {
+				return nil, err
+			}
+			binary = buf.Bytes()
+			frmt = "png"
+		}
 	}
 	ret := &imageEntry{}
 	ret.path = path

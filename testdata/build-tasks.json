@@ -122,6 +122,19 @@
                     ]
                 }
             }
+        },
+        {
+            "label": "Make Win32 Icon",
+            "type": "icon.win32",
+            "sources": [
+                "./app-icon/algo-icon-16.png",
+                "./app-icon/algo-icon-24.png",
+                "./app-icon/algo-icon-32.png",
+                "./app-icon/algo-icon-48.png",
+                "./app-icon/algo-icon-64.png",
+                "./app-icon/algo-icon-128.png"
+            ],
+            "target": "./win32.ico"
         }
     ]
 }

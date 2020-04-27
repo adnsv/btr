@@ -80,6 +80,8 @@ func (c *Config) RunTask(t *Task) error {
 		return RunDir(t, c, "make")
 	case "dir.clean":
 		return RunDir(t, c, "clean")
+	case "icon.win32":
+		return RunIcon(t, c, "win32")
 	default:
 		log.Printf("unsupported task type '%s'", t.Type)
 	}
