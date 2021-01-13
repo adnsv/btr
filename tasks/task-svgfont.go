@@ -167,7 +167,12 @@ func readGlyph(fn string) (*Glyph, error) {
 		return nil, fmt.Errorf("Missing height attr")
 	}
 	if len(sg.Items) == 0 {
-		return nil, fmt.Errorf("Missing elements")
+		g.FilePath = fn
+		g.Width = sg.Width.Value
+		g.Height = sg.Height.Value
+		g.Path = ""
+		g.Transform = nil
+		return g, nil
 	}
 	path, ok := sg.Items[0].(*svg.Path)
 	if !ok || path == nil {
