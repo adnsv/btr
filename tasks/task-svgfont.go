@@ -160,28 +160,48 @@ func readGlyph(fn string) (*Glyph, error) {
 		return nil, err
 	}
 	g := &Glyph{}
-	if sg.Width == nil {
-		return nil, fmt.Errorf("Missing width attr")
+
+	vb, err := sg.ViewBox.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("bad svg.viewBox attribute: %s", err)
 	}
-	if sg.Height == nil {
-		return nil, fmt.Errorf("Missing height attr")
+	var u svg.Units
+	w := vb.Width
+	h := vb.Height
+
+	if sg.Width != "" {
+		w, u, err = sg.Width.AsNumeric()
+		if err != nil {
+			return nil, fmt.Errorf("bad svg.width attribute: %w", err)
+		} else if u != svg.UnitNone && u != svg.UnitPX {
+			return nil, fmt.Errorf("bad svg.width attribute: unexpected units")
+		}
 	}
+	if sg.Height != "" {
+		h, u, err = sg.Height.AsNumeric()
+		if err != nil {
+			return nil, fmt.Errorf("bad svg.height attribute: %w", err)
+		} else if u != svg.UnitNone && u != svg.UnitPX {
+			return nil, fmt.Errorf("bad svg.height attribute: unexpected units")
+		}
+	}
+
 	if len(sg.Items) == 0 {
 		g.FilePath = fn
-		g.Width = sg.Width.Value
-		g.Height = sg.Height.Value
+		g.Width = w
+		g.Height = h
 		g.Path = ""
 		g.Transform = nil
 		return g, nil
 	}
 	path, ok := sg.Items[0].(*svg.Path)
 	if !ok || path == nil {
-		return nil, fmt.Errorf("Does not have path element")
+		return nil, fmt.Errorf("does not have path element")
 	}
 
 	g.FilePath = fn
-	g.Width = sg.Width.Value
-	g.Height = sg.Height.Value
+	g.Width = w
+	g.Height = h
 	g.Path = path.D
 	g.Transform = path.Transform
 
