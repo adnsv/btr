@@ -53,6 +53,9 @@ func RunSVGFontMake(task *Task, config *Config) error {
 		return errors.New("missing firstCodePoint parameter\nspecify \"firstCodePoint\": \"value\" (value is a decimal or hex number) in the task description")
 	}
 	cp, err := ParseCodepoint(task.Font.FirstCodePoint)
+	if err != nil {
+		return err
+	}
 
 	dst := task.Target
 	if len(dst) == 0 {
