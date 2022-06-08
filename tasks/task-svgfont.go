@@ -1,7 +1,6 @@
 package tasks
 
 import (
-	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -155,7 +154,7 @@ func readGlyph(fn string) (*Glyph, error) {
 	if err != nil {
 		return nil, err
 	}
-	sg, err := svg.Parse(bytes.NewReader(data))
+	sg, err := svg.Parse(string(data))
 	if err != nil {
 		return nil, err
 	}
