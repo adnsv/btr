@@ -27,6 +27,7 @@ jobs:
           md5sum: false
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
+          project_path: "./cmd/btr"
           build_flags: -v
           ldflags: -X "main.app_ver=${{ env.APP_VERSION }}"
           compress_assets: zip
