@@ -1,6 +1,6 @@
 # btr
 
-Build Task Runner is a small utility that assists in batch running certain tasks
+Build Task Runner is a utility that assists in batch running certain tasks
 related to building software applications (mostly targeting C++):
 
 - making Win32 icon resources from PNGs
@@ -9,6 +9,20 @@ related to building software applications (mostly targeting C++):
 - converting SVG files into SVG font (also to TTF with svg2ttf utility)
 
 This utility executes a list of tasks described in json configuration file.
+
+## Installation
+
+To install a binary release:
+
+- download the file matching your platform here: [Latest release
+  binaries](https://github.com/adnsv/btr/releases/latest)
+- unzip it into the directory of your choice
+- make sure your system path resolves to that directory
+
+To build and install `btr` from sources:
+
+- make sure you have a recent GO compiler installed
+- execute `go install github.com/adnsv/btr@latest`
 
 ## Config File Structure
 
