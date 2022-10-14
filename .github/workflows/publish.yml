@@ -1,0 +1,32 @@
+name: Build and Publish Releases
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  releases-matrix:
+    name: Release Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows]
+        goarch: [amd64, arm64]
+        
+    steps:
+      - name: Version
+        run: echo APP_VERSION=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV}
+      
+      - name: Checkout
+        uses: actions/checkout@v3      
+
+      - name: Build
+        uses: wangyoucao577/go-release-action@v1.32
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          md5sum: false
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          build_flags: -v
+          ldflags: -X "main.app_ver=${{ env.APP_VERSION }}"
+          compress_assets: zip
