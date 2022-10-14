@@ -12,26 +12,28 @@ import (
 	cli "github.com/jawher/mow.cli"
 )
 
-var appname = "btr"
-var appver = "0.1"
-
 func main() {
-	app := cli.App(appname, "Resource packer utility")
-	app.Spec = "[-v] FILENAME"
-	fn := app.StringArg("FILENAME", "", "A JSON file with packer steps")
-	verbose := app.BoolOpt("v verbose", false, "Show verbose output")
-	version := app.BoolOpt("version", false, "Display version number")
+	app := cli.App("btr", "Resource packer utility")
+	app.Spec = "[--version] [--verbose] FILENAME"
+
+	verbose := false
+	showver := false
+
+	fn := app.StringArg("FILENAME", "", "A JSON file that describes what needs to be done")
+	app.BoolOptPtr(&verbose, "verbose", false, "Show verbose output")
+	app.BoolOptPtr(&showver, "version", false, "Display version number")
+
 	app.Action = func() {
 		cwd, _ := os.Getwd()
 
-		if *version {
-			fmt.Printf("%s %s\n", appname, appver)
+		if showver {
+			show_app_version()
 			return
 		}
 
 		absfn, _ := filepath.Abs(*fn)
 		fmt.Printf("Running config: %s\n", absfn)
-		if *verbose {
+		if verbose {
 			fmt.Printf("CWD: %s\n", cwd)
 		}
 
@@ -39,8 +41,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		config.Verbose = *verbose
-		if *verbose {
+		config.Verbose = verbose
+		if verbose {
 			fmt.Printf("Configuration loaded\n")
 		}
 		if config != nil {
@@ -63,5 +65,6 @@ func main() {
 		}
 		fmt.Print("\nmission accomplished\n")
 	}
+
 	app.Run(os.Args)
 }
