@@ -1,35 +1,35 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/adnsv/btr/codegen"
+	"gopkg.in/yaml.v3"
 
 	"github.com/adnsv/btr/tasks"
 	cli "github.com/jawher/mow.cli"
 )
 
 func main() {
+
 	app := cli.App("btr", "Resource packer utility")
-	app.Spec = "[--version] [--verbose] FILENAME"
+	app.Spec = "[--verbose] [--convert-to=<fn>] FILENAME"
+	app.Version("version", app_version())
 
 	verbose := false
-	showver := false
+	convert_to := ""
 
-	fn := app.StringArg("FILENAME", "", "A JSON file that describes what needs to be done")
-	app.BoolOptPtr(&verbose, "verbose", false, "Show verbose output")
-	app.BoolOptPtr(&showver, "version", false, "Display version number")
+	fn := app.StringArg("FILENAME", "", "A YAML or JSON file that describes what needs to be done")
+	app.BoolOptPtr(&verbose, "v verbose", false, "Show verbose output")
+	app.StringOptPtr(&convert_to, "convert-to", "", "Convert configuration to another format")
 
 	app.Action = func() {
 		cwd, _ := os.Getwd()
-
-		if showver {
-			show_app_version()
-			return
-		}
 
 		absfn, _ := filepath.Abs(*fn)
 		fmt.Printf("Running config: %s\n", absfn)
@@ -40,6 +40,24 @@ func main() {
 		config, err := tasks.LoadConfig(absfn)
 		if err != nil {
 			log.Fatal(err)
+		}
+		if convert_to != "" {
+			ext := strings.ToLower(filepath.Ext(convert_to))
+			switch ext {
+			case ".yaml", ".yml":
+				buf, _ := yaml.Marshal(*config)
+				err = os.WriteFile(convert_to, buf, 0655)
+				if err != nil {
+					log.Fatal(err)
+				}
+			case ".json", ".jsn":
+				buf, _ := json.MarshalIndent(config, "", "\t")
+				err = os.WriteFile(convert_to, buf, 0655)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+			return
 		}
 		config.Verbose = verbose
 		if verbose {

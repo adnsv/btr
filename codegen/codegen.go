@@ -7,12 +7,12 @@ import (
 )
 
 type Config struct {
-	TopMatter       Matter                       `json:"top-matter"`
-	BottomMatter    Matter                       `json:"bottom-matter"`
-	CPP             *CPPConfig                   `json:"c++"`
-	OnBeforeWrite   func(path string)            `json:"-"`
-	OnWriteSucceded func(path string)            `json:"-"`
-	OnWriteFailed   func(path string, err error) `json:"-"`
+	TopMatter       Matter                       `json:"top-matter,omitempty" yaml:"top-matter,omitempty"`
+	BottomMatter    Matter                       `json:"bottom-matter,omitempty" yaml:"bottom-matter,omitempty"`
+	CPP             *CPPConfig                   `json:"c++,omitempty" yaml:"c++,omitempty"`
+	OnBeforeWrite   func(path string)            `json:"-" yaml:"-"`
+	OnWriteSucceded func(path string)            `json:"-" yaml:"-"`
+	OnWriteFailed   func(path string, err error) `json:"-" yaml:"-"`
 }
 
 type Matter map[string][]string

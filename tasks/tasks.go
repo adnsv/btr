@@ -9,26 +9,26 @@ import (
 // Task contains a description and all the parameters required for execution of
 // a task
 type Task struct {
-	Label   string      `json:"label"`
-	Type    string      `json:"type"`
-	Source  string      `json:"source"`
-	Sources []string    `json:"sources"`
-	Target  string      `json:"target"`
-	Targets []string    `json:"targets"`
-	Font    *FontConfig `json:"font"`
-	Codegen TaskCodegen `json:"codegen"`
-	Format  string      `json:"format"`
+	Label   string      `json:"label,omitempty" yaml:"label,omitempty"`
+	Type    string      `json:"type,omitempty" yaml:"type,omitempty"`
+	Source  string      `json:"source,omitempty" yaml:"source,omitempty"`
+	Sources []string    `json:"sources,omitempty" yaml:"sources,omitempty"`
+	Target  string      `json:"target,omitempty" yaml:"target,omitempty"`
+	Targets []string    `json:"targets,omitempty" yaml:"targets,omitempty"`
+	Font    *FontConfig `json:"font,omitempty" yaml:"font,omitempty"`
+	Codegen TaskCodegen `json:"codegen,omitempty" yaml:"codegen,omitempty"`
+	Format  string      `json:"format,omitempty" yaml:"format,omitempty"`
 }
 
 type TaskCodegen struct {
-	Namespace    string         `json:"namespace"`
-	TypeName     *string        `json:"typename"`
-	ValuePrefix  string         `json:"value.prefix"`
-	ValuePostfix string         `json:"value.postfix"`
-	IdentPrefix  string         `json:"ident.prefix"`
-	IdentPostfix string         `json:"ident.postfix"`
-	TopMatter    codegen.Matter `json:"top-matter"`
-	BottomMatter codegen.Matter `json:"bottom-matter"`
+	Namespace    string         `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	TypeName     *string        `json:"typename,omitempty" yaml:"typename,omitempty"`
+	ValuePrefix  string         `json:"value.prefix,omitempty" yaml:"value-prefix,omitempty"`
+	ValuePostfix string         `json:"value.postfix,omitempty" yaml:"value-postfix,omitempty"`
+	IdentPrefix  string         `json:"ident.prefix,omitempty" yaml:"ident-prefix,omitempty"`
+	IdentPostfix string         `json:"ident.postfix,omitempty" yaml:"ident-postfix,omitempty"`
+	TopMatter    codegen.Matter `json:"top-matter,omitempty" yaml:"top-matter,omitempty"`
+	BottomMatter codegen.Matter `json:"bottom-matter,omitempty" yaml:"bottom-matter,omitempty"`
 }
 
 // GetSources combines Source and Sources into a single list

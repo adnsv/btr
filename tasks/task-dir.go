@@ -22,6 +22,9 @@ func RunDir(task *Task, config *Config, cmd string) error {
 	case "clean":
 		for _, dir := range dirs {
 			rel, err := filepath.Rel(filepath.Dir(config.BaseDir), dir)
+			if err != nil {
+				return err
+			}
 			if rel == "" || rel[0] == '.' {
 				// a bit of safety: don't delete self and don't delete external paths
 				return fmt.Errorf("failed 'dir.clean': external path '%s' is not allowed", dir)

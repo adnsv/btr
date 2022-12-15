@@ -6,16 +6,18 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+	"strings"
 
 	"github.com/adnsv/btr/codegen"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	BaseDir string          `json:"-"`
-	Verbose bool            `json:"-"`
-	Version string          `json:"version"`
-	Codegen *codegen.Config `json:"codegen"`
-	Tasks   []*Task         `json:"tasks"`
+	BaseDir string          `json:"-" yaml:"-"`
+	Verbose bool            `json:"-" yaml:"-"`
+	Version string          `json:"version" yaml:"version"`
+	Codegen *codegen.Config `json:"codegen" yaml:"codegen"`
+	Tasks   []*Task         `json:"tasks" yaml:"tasks"`
 }
 
 func LoadConfig(fn string) (*Config, error) {
@@ -24,7 +26,12 @@ func LoadConfig(fn string) (*Config, error) {
 		return nil, err
 	}
 	config := &Config{}
-	err = json.Unmarshal(buf, &config)
+	ext := strings.ToLower(filepath.Ext(fn))
+	if ext == ".yaml" || ext == ".yml" {
+		err = yaml.Unmarshal(buf, &config)
+	} else {
+		err = json.Unmarshal(buf, &config)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config from %q:\n%s",
 			fn, jsonErrDetail(string(buf), err))

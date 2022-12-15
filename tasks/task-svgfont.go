@@ -20,10 +20,10 @@ import (
 )
 
 type FontConfig struct {
-	FirstCodePoint string `json:"firstCodePoint"`
-	Height         *int   `json:"height"`
-	Descent        *int   `json:"descent"`
-	Family         string `json:"family"`
+	FirstCodePoint string `json:"firstCodePoint" yaml:"first-codepoint"`
+	Height         *int   `json:"height" yaml:"height"`
+	Descent        *int   `json:"descent" yaml:"descent"`
+	Family         string `json:"family" yaml:"family"`
 }
 
 // ParseCodepoint extracts unicode codepoint value from a string which can
