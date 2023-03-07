@@ -1,23 +1,21 @@
 package tasks
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"strings"
 
-	"github.com/adnsv/btr/codegen"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	BaseDir string          `json:"-" yaml:"-"`
-	Verbose bool            `json:"-" yaml:"-"`
-	Version string          `json:"version" yaml:"version"`
-	Codegen *codegen.Config `json:"codegen" yaml:"codegen"`
-	Tasks   []*Task         `json:"tasks" yaml:"tasks"`
+	BaseDir string            `yaml:"-"`
+	Verbose bool              `yaml:"-"`
+	Version string            `yaml:"version"`
+	Vars    map[string]string `yaml:"vars"`
+	Tasks   []*Task           `yaml:"tasks"`
 }
 
 func LoadConfig(fn string) (*Config, error) {
@@ -29,12 +27,14 @@ func LoadConfig(fn string) (*Config, error) {
 	ext := strings.ToLower(filepath.Ext(fn))
 	if ext == ".yaml" || ext == ".yml" {
 		err = yaml.Unmarshal(buf, &config)
+	} else if ext == ".json" {
+		return nil, fmt.Errorf("json format is no longer supported")
 	} else {
-		err = json.Unmarshal(buf, &config)
+		return nil, fmt.Errorf("only files with .yaml and .yml extensions are supported")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config from %q:\n%s",
-			fn, jsonErrDetail(string(buf), err))
+			fn, err)
 	}
 	config.BaseDir, err = filepath.Abs(filepath.Dir(fn))
 	if err != nil {

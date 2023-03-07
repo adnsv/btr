@@ -2,34 +2,41 @@ package tasks
 
 import (
 	"path/filepath"
-
-	"github.com/adnsv/btr/codegen"
 )
 
 // Task contains a description and all the parameters required for execution of
 // a task
 type Task struct {
-	Label   string      `json:"label,omitempty" yaml:"label,omitempty"`
-	Type    string      `json:"type,omitempty" yaml:"type,omitempty"`
-	Source  string      `json:"source,omitempty" yaml:"source,omitempty"`
-	Sources []string    `json:"sources,omitempty" yaml:"sources,omitempty"`
-	Target  string      `json:"target,omitempty" yaml:"target,omitempty"`
-	Targets []string    `json:"targets,omitempty" yaml:"targets,omitempty"`
-	Font    *FontConfig `json:"font,omitempty" yaml:"font,omitempty"`
-	Codegen TaskCodegen `json:"codegen,omitempty" yaml:"codegen,omitempty"`
-	Format  string      `json:"format,omitempty" yaml:"format,omitempty"`
+	Label   string      `yaml:"label,omitempty"`
+	Type    string      `yaml:"type,omitempty"`
+	Source  string      `yaml:"source,omitempty"`
+	Sources []string    `yaml:"sources,omitempty"`
+	Target  string      `yaml:"target,omitempty"`
+	Targets []string    `yaml:"targets,omitempty"`
+	Font    *FontConfig `yaml:"font,omitempty"`
+	Format  string      `yaml:"format,omitempty"`
+
+	HppTarget *HppTarget `yaml:"hpp-target"`
+	CppTarget *CppTarget `yaml:"cpp-target"`
 }
 
-type TaskCodegen struct {
-	Namespace    string         `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	EntryFmt     string         `json:"entry.fmt,omitempty" yaml:"entry-fmt,omitempty"`
-	TypeName     *string        `json:"typename,omitempty" yaml:"typename,omitempty"`
-	ValuePrefix  string         `json:"value.prefix,omitempty" yaml:"value-prefix,omitempty"`
-	ValuePostfix string         `json:"value.postfix,omitempty" yaml:"value-postfix,omitempty"`
-	IdentPrefix  string         `json:"ident.prefix,omitempty" yaml:"ident-prefix,omitempty"`
-	IdentPostfix string         `json:"ident.postfix,omitempty" yaml:"ident-postfix,omitempty"`
-	TopMatter    codegen.Matter `json:"top-matter,omitempty" yaml:"top-matter,omitempty"`
-	BottomMatter codegen.Matter `json:"bottom-matter,omitempty" yaml:"bottom-matter,omitempty"`
+type FontConfig struct {
+	FirstCodePoint string `yaml:"first-codepoint"`
+	Height         *int   `yaml:"height"`
+	Descent        *int   `yaml:"descent"`
+	Family         string `yaml:"family"`
+}
+
+type HppTarget struct {
+	File    string `yaml:"file"`
+	Entry   string `yaml:"entry"`
+	Content string `yaml:"content"`
+}
+
+type CppTarget struct {
+	File    string `yaml:"file"`
+	Entry   string `yaml:"entry"`
+	Content string `yaml:"content"`
 }
 
 // GetSources combines Source and Sources into a single list

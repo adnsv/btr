@@ -1,9 +1,11 @@
 package tasks
 
 import (
+	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -15,16 +17,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/adnsv/btr/codegen"
 	"github.com/adnsv/svg"
+	"golang.org/x/exp/maps"
 )
-
-type FontConfig struct {
-	FirstCodePoint string `json:"firstCodePoint" yaml:"first-codepoint"`
-	Height         *int   `json:"height" yaml:"height"`
-	Descent        *int   `json:"descent" yaml:"descent"`
-	Family         string `json:"family" yaml:"family"`
-}
 
 // ParseCodepoint extracts unicode codepoint value from a string which can
 // be a decimal number or a hex (U+0000 or 0x0000 or 0X0000)
@@ -130,12 +125,21 @@ func RunSVGFontMake(task *Task, config *Config) error {
 		familyname = filepath.Base(dst)
 		familyname = familyname[:len(familyname)-len(filepath.Ext(familyname))]
 	}
-	svg := codegen.NewBuffer(dst, config.Codegen)
-	err = makeSVGFont(svg, glyphs, ascent, descent, familyname)
+	out := bytes.Buffer{}
+	err = makeSVGFont(&out, glyphs, ascent, descent, familyname)
 	if err != nil {
 		return err
 	}
-	return svg.WriteOut()
+
+	fmt.Printf("writing %s ... ", dst)
+	err = os.WriteFile(dst, out.Bytes(), 0x666)
+	if err == nil {
+		fmt.Printf("SUCCEEDED\n")
+	} else {
+		fmt.Printf("FAILED\n")
+	}
+
+	return err
 }
 
 type Glyph struct {
@@ -211,13 +215,13 @@ func readGlyph(fn string) (*Glyph, error) {
 	return g, nil
 }
 
-func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
+func makeSVGFont(out io.Writer, glyphs []*Glyph,
 	fontAscent, fontDescent int, fontName string) error {
 
 	fontHeight := fontAscent + fontDescent
 	horizAdvX := fontHeight
 
-	out.Printf(`<svg xmlns='http://www.w3.org/2000/svg'>
+	fmt.Fprintf(out, `<svg xmlns='http://www.w3.org/2000/svg'>
 <defs>
 <font id="%s" horiz-adv-x="%d">
 	<font-face
@@ -246,7 +250,7 @@ func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
 		adv := int(math.Round(g.Width * scale))
 
 		pds := pd.String()
-		out.Printf(`
+		fmt.Fprintf(out, `
 	<glyph
 		glyph-name="%s"
 		unicode="&#x%x;"
@@ -255,16 +259,27 @@ func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
 			g.Name, g.CodePoint, pds, adv)
 	}
 
-	out.Print("\n</font>\n</defs>\n</svg>/n")
+	fmt.Fprintf(out, "\n</font>\n</defs>\n</svg>/n")
 	return nil
 }
 
 func RunSVGFontHPP(task *Task, config *Config) error {
 	src := task.Source
-	var err error
-	if len(src) == 0 {
-		return errors.New("missing source path\nplease specify \"source\": \"filepath\" in the task description")
+	if src == "" {
+		return errors.New("missing 'source' or 'sources' field")
 	}
+	dst := task.Target
+	if dst == "" {
+		return errors.New("missing 'target' or 'targets' field")
+	}
+	if task.HppTemplate == "" {
+		return errors.New("missing 'hpp-template' field")
+	}
+	if task.HppEntryTemplate == "" {
+		return errors.New("missing 'entry-template' field")
+	}
+
+	var err error
 	if !filepath.IsAbs(src) {
 		src = filepath.Join(config.BaseDir, src)
 		src, err = filepath.Abs(src)
@@ -273,10 +288,6 @@ func RunSVGFontHPP(task *Task, config *Config) error {
 		}
 	}
 
-	dst := task.Target
-	if len(dst) == 0 {
-		return errors.New("missing target path\nplease specify \"target\": \"filepath\" in the task description")
-	}
 	if !filepath.IsAbs(dst) {
 		dst = filepath.Join(config.BaseDir, dst)
 		dst, err = filepath.Abs(dst)
@@ -288,16 +299,26 @@ func RunSVGFontHPP(task *Task, config *Config) error {
 	if config.Verbose {
 		fmt.Printf("reading %q\n", src)
 	}
-	hpp := codegen.NewBuffer(dst, config.Codegen)
-	hpp.WriteLines(config.Codegen.TopMatter.Lines("hpp")...)
-	hpp.WriteLines(task.Codegen.TopMatter.Lines("hpp")...)
-	err = generateSVGFontHPP(hpp, src, config.Codegen, &task.Codegen)
+
+	buf := bytes.Buffer{}
+	out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+
+	vv := maps.Clone(config.Vars)
+	err = generateSVGFontHPP(out, src, vv, task.HppTemplate, task.EntryTemplate)
 	if err != nil {
 		return err
 	}
-	hpp.WriteLines(task.Codegen.BottomMatter.Lines("hpp")...)
-	hpp.WriteLines(config.Codegen.BottomMatter.Lines("hpp")...)
-	return hpp.WriteOut()
+	out.Flush()
+
+	fmt.Printf("writing %s ... ", dst)
+	err = os.WriteFile(dst, buf.Bytes(), 0x666)
+	if err == nil {
+		fmt.Printf("SUCCEEDED\n")
+	} else {
+		fmt.Printf("FAILED\n")
+	}
+
+	return err
 }
 
 type SVGFont struct {
@@ -310,8 +331,8 @@ type SVGGlyph struct {
 	Unicode string `xml:"unicode,attr"`
 }
 
-func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Config, cg *TaskCodegen) error {
-	buf, err := ioutil.ReadFile(srcpath)
+func generateSVGFontHPP(out io.Writer, svgfn string, globalVars map[string]string, hppTemplate, entryTemplate string) error {
+	buf, err := ioutil.ReadFile(svgfn)
 	if err != nil {
 		return err
 	}
@@ -347,22 +368,10 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 		return errors.New("no codepoints found")
 	}
 
-	out.Printf("// codepoint range: U+%X - U+%X\n", cpmin, cpmax)
-
-	out.BeginCppNamespace(cg.Namespace)
-
-	tw := tabwriter.NewWriter(out, 0, 0, 1, ' ', 0)
-
-	typestr := "constexpr char const*"
-	if cg.TypeName != nil {
-		typestr = *cg.TypeName
-	}
-	if len(typestr) > 0 && typestr[len(typestr)-1] != ' ' {
-		typestr += " "
-	}
-
+	entryLines := []string{}
 	for _, g := range font.Glyphs {
 		runes := []rune(g.Unicode)
+
 		if len(runes) != 1 {
 			continue
 		}
@@ -374,38 +383,45 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 		}
 		hex := fmt.Sprintf("%X", cp)
 
-		if cg.EntryFmt != "" {
-			r := strings.NewReplacer(
-				"${ident}", MakeIdentStr(g.Name),
-				"${name}", g.Name,
-				"${unicode}", hex,
-				"${escaped}", escaped,
-			)
-			s := r.Replace(cg.EntryFmt)
-			fmt.Println(tw, s)
-
-		} else {
-			ident := cg.IdentPrefix + MakeIdentStr(g.Name) + cg.IdentPostfix
-			value := fmt.Sprintf("%s\"%s\"%s", cg.ValuePrefix, escaped, cg.ValuePostfix)
-
-			fmt.Fprintf(tw, "%s%s\t= %s;\t// U+%s %s\n", typestr, ident, value, hex, g.Name)
-
+		entryVars := map[string]string{
+			"name":    g.Name,
+			"ident":   MakeIdentStr(g.Name),
+			"unicode": hex,
+			"escaped": escaped,
 		}
+
+		line, err := ExpandVariables(entryTemplate, entryVars)
+		if err != nil {
+			return fmt.Errorf("entry template: %w", err)
+		}
+
+		entryLines = append(entryLines, line)
 	}
-	tw.Flush()
 
-	out.EndCppNamespace(cg.Namespace)
-	out.WriteBottomMatter()
+	globalVars["codepoint-min"] = fmt.Sprintf("%X", cpmin)
+	globalVars["codepoint-max"] = fmt.Sprintf("%X", cpmax)
+	globalVars["entries"] = strings.Join(entryLines, "\n")
 
-	return nil
+	fileContent, err := ExpandVariables(hppTemplate, globalVars)
+	if err != nil {
+		return fmt.Errorf("hpp-template: %w", err)
+	}
+
+	_, err = out.Write([]byte(fileContent))
+	return err
 }
 
 func RunSVGFontTTF(task *Task, config *Config) error {
 	src := task.Source
-	var err error
-	if len(src) == 0 {
-		return errors.New("missing source path\nplease specify \"source\": \"filepath\" in the task description")
+	if src == "" {
+		return errors.New("missing 'source' or 'sources' field")
 	}
+	dst := task.Target
+	if len(dst) == 0 {
+		return errors.New("missing 'target' or 'targets' field")
+	}
+
+	var err error
 	if !filepath.IsAbs(src) {
 		src = filepath.Join(config.BaseDir, src)
 		src, err = filepath.Abs(src)
@@ -414,10 +430,6 @@ func RunSVGFontTTF(task *Task, config *Config) error {
 		}
 	}
 
-	dst := task.Target
-	if len(dst) == 0 {
-		return errors.New("missing target path\nplease specify \"target\": \"filepath\" in the task description")
-	}
 	if !filepath.IsAbs(dst) {
 		dst = filepath.Join(config.BaseDir, dst)
 		dst, err = filepath.Abs(dst)
@@ -445,7 +457,7 @@ func RunSVGFontTTF(task *Task, config *Config) error {
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("svg2ttf: %w", err)
 	}
 
 	return nil

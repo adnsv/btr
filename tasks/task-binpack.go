@@ -1,13 +1,15 @@
 package tasks
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
-	"github.com/adnsv/btr/codegen"
+	"golang.org/x/exp/maps"
 )
 
 func RunBinPackCPP(task *Task, config *Config) error {
@@ -16,6 +18,27 @@ func RunBinPackCPP(task *Task, config *Config) error {
 	if len(targets) != 2 {
 		return errors.New("missing or invalid targets\nplease specify two targets \"targets\": [\"filepath.hpp\", \"filepath.cpp\"] in the task description")
 	}
+	sources := task.GetSources()
+	if len(sources) == 0 {
+		return errors.New("missing 'source' field")
+	}
+	filepaths, err := AbsExistingPaths(config.BaseDir, sources)
+	if err != nil {
+		return err
+	}
+	if task.HppTemplate == "" {
+		return errors.New("missing 'hpp-template' field")
+	}
+	if task.CppTemplate == "" {
+		return errors.New("missing 'cpp-template' field")
+	}
+	if task.HppEntryTemplate == "" {
+		return errors.New("missing 'hpp-entry-template' field")
+	}
+	if task.CppEntryTemplate == "" {
+		return errors.New("missing 'cpp-entry-template' field")
+	}
+
 	hpath := targets[0]
 	cpath := targets[1]
 	if !filepath.IsAbs(hpath) {
@@ -35,55 +58,62 @@ func RunBinPackCPP(task *Task, config *Config) error {
 	hpath = filepath.Clean(hpath)
 	cpath = filepath.Clean(cpath)
 
-	sources := task.GetSources()
-	if len(sources) == 0 {
-		return errors.New("missing source paths\nspecify \"source\": \"path\" or \"sources\": [\"path\",...] in the task description")
-	}
-	filepaths, err := AbsExistingPaths(config.BaseDir, sources)
-	if err != nil {
-		return err
-	}
-
-	namespace := task.Codegen.Namespace
-
-	hpp := codegen.NewBuffer(hpath, config.Codegen)
-	cpp := codegen.NewBuffer(cpath, config.Codegen)
-	hpp.WriteLines(config.Codegen.TopMatter.Lines("hpp")...)
-	hpp.WriteLines(task.Codegen.TopMatter.Lines("hpp")...)
-	cpp.WriteLines(config.Codegen.TopMatter.Lines("cpp")...)
-	cpp.WriteLines(task.Codegen.TopMatter.Lines("cpp")...)
-
-	hpp.BeginCppNamespace(namespace)
-	cpp.BeginCppNamespace(namespace)
-
+	hpp_entries := []string{}
+	cpp_entries := []string{}
 	for _, path := range filepaths {
 		if config.Verbose {
 			fmt.Printf("loading %q\n", path)
 		}
-		name := filepath.Base(path)
-		name = name[:len(name)-len(filepath.Ext(path))]
-		name = strings.ReplaceAll(name, "-", "_")
 
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
 		}
-
-		hpp.Printf("extern const std::array<unsigned char, %d> %s;\n",
-			len(data), name)
-
-		cpp.Printf("const std::array<unsigned char, %d> %s = {",
-			len(data), name)
-		s := ""
+		bytestr := ""
 		for i, b := range data {
 			if i%32 == 0 {
-				s += "\n\t"
+				bytestr += "\n\t"
 			}
-			s += fmt.Sprintf("0x%.2x,", b)
+			bytestr += fmt.Sprintf("0x%.2x,", b)
 		}
-		cpp.Print(s[:len(s)-1])
-		cpp.Print("};\n")
+
+		filename := filepath.Base(path)
+		ident := filename[:len(filename)-len(filepath.Ext(path))]
+		ident = strings.ReplaceAll(filename, "-", "_")
+
+		entry_vars := map[string]string{
+			"byte-count": fmt.Sprintf("%d", len(data)),
+			"bytes":      bytestr,
+			"filename":   filename,
+			"ident":      ident,
+		}
+
+		hpp_entry, err := ExpandVariables(task.HppEntryTemplate, entry_vars)
+		if err != nil {
+			return fmt.Errorf("hpp-entry-template: %w", err)
+		}
+		cpp_entry, err := ExpandVariables(task.CppEntryTemplate, entry_vars)
+		if err != nil {
+			return fmt.Errorf("cpp-entry-template: %w", err)
+		}
+		hpp_entries = append(hpp_entries, hpp_entry)
+		cpp_entries = append(cpp_entries, cpp_entry)
 	}
+
+	{
+		vars := maps.Clone(config.Vars)
+		vars["entries"] = strings.Join(hpp_entries, "\n\n")
+		cont, err := ExpandVariables(task.HppTemplate, vars)
+		if err != nil {
+			return fmt.Errorf("hpp-template: %w", err)
+		}
+		buf := bytes.Buffer{}
+		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+
+	}
+
+	cpp_buf := bytes.Buffer{}
+	cpp_out := tabwriter.NewWriter(&cpp_buf, 0, 4, 1, ' ', 0)
 
 	hpp.EndCppNamespace(namespace)
 	hpp.WriteLines(task.Codegen.BottomMatter.Lines("hpp")...)
