@@ -131,14 +131,10 @@ func RunSVGFontMake(task *Task, config *Config) error {
 		familyname = familyname[:len(familyname)-len(filepath.Ext(familyname))]
 	}
 	svg := codegen.NewBuffer(dst, config.Codegen)
-	svg.WriteLines(config.Codegen.TopMatter.Lines("svg")...)
-	svg.WriteLines(task.Codegen.TopMatter.Lines("svg")...)
 	err = makeSVGFont(svg, glyphs, ascent, descent, familyname)
 	if err != nil {
 		return err
 	}
-	svg.WriteLines(task.Codegen.BottomMatter.Lines("svg")...)
-	svg.WriteLines(config.Codegen.BottomMatter.Lines("svg")...)
 	return svg.WriteOut()
 }
 
@@ -221,7 +217,8 @@ func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
 	fontHeight := fontAscent + fontDescent
 	horizAdvX := fontHeight
 
-	out.Printf(`<defs>
+	out.Printf(`<svg xmlns='http://www.w3.org/2000/svg'>
+<defs>
 <font id="%s" horiz-adv-x="%d">
 	<font-face
 		font-family="%s"
@@ -258,7 +255,7 @@ func makeSVGFont(out *codegen.Buffer, glyphs []*Glyph,
 			g.Name, g.CodePoint, pds, adv)
 	}
 
-	out.Print("\n</font>\n</defs>\n")
+	out.Print("\n</font>\n</defs>\n</svg>/n")
 	return nil
 }
 
@@ -352,6 +349,10 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 
 	out.Printf("// codepoint range: U+%X - U+%X\n", cpmin, cpmax)
 
+	out.BeginCppNamespace(cg.Namespace)
+
+	tw := tabwriter.NewWriter(out, 0, 0, 1, ' ', 0)
+
 	typestr := "constexpr char const*"
 	if cg.TypeName != nil {
 		typestr = *cg.TypeName
@@ -360,9 +361,6 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 		typestr += " "
 	}
 
-	out.BeginCppNamespace(cg.Namespace)
-
-	tw := tabwriter.NewWriter(out, 0, 0, 1, ' ', 0)
 	for _, g := range font.Glyphs {
 		runes := []rune(g.Unicode)
 		if len(runes) != 1 {
@@ -375,13 +373,24 @@ func generateSVGFontHPP(out *codegen.Buffer, srcpath string, config *codegen.Con
 			escaped += fmt.Sprintf(`\x%x`, u8[i])
 		}
 		hex := fmt.Sprintf("%X", cp)
-		ident := MakeIdentStr(g.Name)
-		fmt.Fprintf(tw, "%s%s%s%s\t= %s\"%s\"%s;\t// U+%s %s\n",
-			typestr, cg.IdentPrefix, ident,
-			cg.IdentPostfix, cg.ValuePrefix,
-			escaped,
-			cg.ValuePostfix, hex, g.Name,
-		)
+
+		if cg.EntryFmt != "" {
+			r := strings.NewReplacer(
+				"${ident}", MakeIdentStr(g.Name),
+				"${name}", g.Name,
+				"${unicode}", hex,
+				"${escaped}", escaped,
+			)
+			s := r.Replace(cg.EntryFmt)
+			fmt.Println(tw, s)
+
+		} else {
+			ident := cg.IdentPrefix + MakeIdentStr(g.Name) + cg.IdentPostfix
+			value := fmt.Sprintf("%s\"%s\"%s", cg.ValuePrefix, escaped, cg.ValuePostfix)
+
+			fmt.Fprintf(tw, "%s%s\t= %s;\t// U+%s %s\n", typestr, ident, value, hex, g.Name)
+
+		}
 	}
 	tw.Flush()
 

@@ -22,6 +22,7 @@ type Task struct {
 
 type TaskCodegen struct {
 	Namespace    string         `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	EntryFmt     string         `json:"entry.fmt,omitempty" yaml:"entry-fmt,omitempty"`
 	TypeName     *string        `json:"typename,omitempty" yaml:"typename,omitempty"`
 	ValuePrefix  string         `json:"value.prefix,omitempty" yaml:"value-prefix,omitempty"`
 	ValuePostfix string         `json:"value.postfix,omitempty" yaml:"value-postfix,omitempty"`
