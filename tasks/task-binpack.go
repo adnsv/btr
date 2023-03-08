@@ -2,9 +2,7 @@ package tasks
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,122 +11,111 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func (prj *Project) RunBinPackCPP(task *Task) error {
+func RunBinpackTask(prj *Project, fields map[string]any) error {
+	sources := []string{}
+	targets := []*Target{}
 	var err error
-	src_fns := prj.AbsExistingPaths(task.GetSources())
-	if len(sources) == 0 {
-		return errors.New("missing source")
-	}
+	for k, v := range fields {
+		switch k {
+		case "source":
+			sources, err = prj.GetStrings(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
 
-	if task.HppTarget == nil {
-		return errors.New("missing 'hpp-target")
-	}
-	if task.HppTarget.File == "" {
-		return errors.New("missing 'hpp-target.file")
-	}
-	if task.HppTarget.Entry == "" {
-		return errors.New("missing 'hpp-target.entry")
-	}
-	if task.HppTarget.Content == "" {
-		return errors.New("missing 'hpp-target.content")
-	}
-	if task.CppTarget == nil {
-		return errors.New("missing 'cpp-target")
-	}
-	if task.CppTarget.File == "" {
-		return errors.New("missing 'cpp-target.file")
-	}
-	if task.CppTarget.Entry == "" {
-		return errors.New("missing 'cpp-target.entry")
-	}
-	if task.CppTarget.Content == "" {
-		return errors.New("missing 'cpp-target.content")
-	}
-
-	hpp_fn := prj.AbsPath(task.HppTarget.File)
-	cpp_fn := prj.AbsPath(task.CppTarget.File)
-
-	hpp_entries := []string{}
-	cpp_entries := []string{}
-	for _, path := range src_fns {
-		if prj.Verbose {
-			fmt.Printf("loading %q\n", path)
+		case "target":
+			targets, err = prj.GetTargets(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			if len(targets) == 0 {
+				return fmt.Errorf("%s: must not be empty", k)
+			}
 		}
+	}
 
-		data, err := ioutil.ReadFile(path)
+	if len(sources) == 0 {
+		return fmt.Errorf("missing field: source")
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("missing field: target")
+	}
+
+	source_fns, err := prj.AbsExistingPaths(sources)
+	if err != nil {
+		return fmt.Errorf("source: %w", err)
+	} else if len(source_fns) == 0 {
+		return fmt.Errorf("no sources found")
+	}
+
+	type blobInfo struct {
+		filename string
+		ident    string
+		data     []byte
+		bytestr  string
+	}
+
+	blobs := []*blobInfo{}
+	for _, source_fn := range source_fns {
+		if prj.Verbose {
+			fmt.Printf("loading %q\n", source_fn)
+		}
+		data, err := os.ReadFile(source_fn)
 		if err != nil {
 			return err
 		}
-		bytestr := ""
+
+		filename := filepath.Base(source_fn)
+		ident := strings.ToLower(filename)
+		ident = strings.ReplaceAll(ident, ".", "_")
+		ident = strings.ReplaceAll(ident, "-", "_")
+
+		bytestr := "    "
 		for i, b := range data {
-			if i%32 == 0 {
-				bytestr += "\n\t"
+			if i > 0 && i%32 == 0 {
+				bytestr += "\n    "
 			}
 			bytestr += fmt.Sprintf("0x%.2x,", b)
 		}
-
-		filename := filepath.Base(path)
-		ident := filename[:len(filename)-len(filepath.Ext(path))]
-		ident = strings.ReplaceAll(filename, "-", "_")
-
-		entry_vars := map[string]string{
-			"byte-count": fmt.Sprintf("%d", len(data)),
-			"bytes":      bytestr,
-			"filename":   filename,
-			"ident":      ident,
-		}
-
-		hpp_entry, err := ExpandVariables(task.HppTarget.Entry, entry_vars)
-		if err != nil {
-			return fmt.Errorf("hpp-target.entry: %w", err)
-		}
-		cpp_entry, err := ExpandVariables(task.CppTarget.Entry, entry_vars)
-		if err != nil {
-			return fmt.Errorf("cpp-target.entry: %w", err)
-		}
-		hpp_entries = append(hpp_entries, hpp_entry)
-		cpp_entries = append(cpp_entries, cpp_entry)
+		blobs = append(blobs, &blobInfo{filename: filename, ident: ident, data: data, bytestr: bytestr})
 	}
 
-	{
-		vars := maps.Clone(prj.Vars)
-		vars["entries"] = strings.Join(hpp_entries, "\n\n")
-		cont, err := ExpandVariables(task.HppTarget.Content, vars)
-		if err != nil {
-			return fmt.Errorf("hpp-template: %w", err)
+	for _, target := range targets {
+		entries := []string{}
+
+		for _, blob := range blobs {
+			entry_vars := maps.Clone(prj.Vars)
+			entry_vars["byte-count"] = fmt.Sprintf("%d", len(blob.data))
+			entry_vars["bytes"] = blob.bytestr
+			entry_vars["filename"] = blob.filename
+			entry_vars["ident"] = blob.ident
+			entry, err := ExpandVariables(target.Entry, entry_vars)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, entry)
 		}
+
+		file_vars := maps.Clone(prj.Vars)
+		file_vars["entries"] = strings.Join(entries, "\n\n")
+		content, err := ExpandVariables(target.Content, file_vars)
+		if err != nil {
+			return err
+		}
+
 		buf := bytes.Buffer{}
 		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
-		fmt.Fprint(out, cont)
-		fmt.Printf("writing %s ... ", hpp_fn)
-		err = os.WriteFile(hpp_fn, buf.Bytes(), 0x666)
+		fmt.Fprint(out, content)
+		out.Flush()
+
+		fmt.Printf("writing %s ... ", target.File)
+		err = os.WriteFile(target.File, buf.Bytes(), 0666)
 		if err == nil {
 			fmt.Printf("SUCCEEDED\n")
 		} else {
 			fmt.Printf("FAILED\n")
-			return err
-		}
-
-	}
-	{
-		vars := maps.Clone(prj.Vars)
-		vars["entries"] = strings.Join(cpp_entries, "\n\n")
-		cont, err := ExpandVariables(task.CppTarget.Content, vars)
-		if err != nil {
-			return fmt.Errorf("cpp-template: %w", err)
-		}
-		buf := bytes.Buffer{}
-		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
-		fmt.Fprint(out, cont)
-		fmt.Printf("writing %s ... ", cpp_fn)
-		err = os.WriteFile(cpp_fn, buf.Bytes(), 0x666)
-		if err == nil {
-			fmt.Printf("SUCCEEDED\n")
-		} else {
-			fmt.Printf("FAILED\n")
-			return err
 		}
 	}
 
-	return err
+	return nil
 }

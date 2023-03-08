@@ -1,0 +1,102 @@
+version: 2.0.0
+vars:
+  "app-font-src": "./app-font/*.svg"
+  "app-font": "app-font"
+  "app-icon": "app-icon"
+
+  "cpp-head": |
+    // DO NOT EDIT: Generated file
+    // clang-format off
+
+  "hpp-head": |
+    #pragma once
+
+    // DO NOT EDIT: Generated file
+    // clang-format off
+
+tasks:
+  - name: Create directory for temorary files
+    type: dir
+    if-missing: create
+    var: tmp-dir
+
+  - name: Make SVG font
+    type: svgfont
+    source: ${app-font-src}
+    target: ${tmp-dir}/${app-font}.svg
+    first-codepoint: U+F000
+
+  - name: Convert SVG font to TTF
+    type: ttf
+    source: ${tmp-dir}/${app-font}.svg
+    target: ${tmp-dir}/${app-font}.ttf
+
+  - name: Make C++ header for font glyphs
+    type: glyph-names
+    source: ${tmp-dir}/${app-font}.svg
+    target:
+      file: ./${app-font}-glyphs.hpp
+      entry: "char const* ${ident}\t= \"${escaped}\";\t// ${unicode} ${name}"
+      content: |
+        ${hpp-head}
+
+        // codepoint range: U+${codepoint-min} - U+${codepoint-max}
+
+        namespace icon {
+
+        ${entries}
+
+        } // namespace icon
+
+  - name: Generate C++ binary resource for TTF font
+    type: binpack
+    source: ${tmp-dir}/${app-font}.ttf
+    target:
+      - file: ./${app-font}-resource.hpp
+        entry: extern const std::array<unsigned char, ${byte-count}> ${ident};
+        content: |
+          ${hpp-head}
+          #include <array>
+
+          namespace resource {
+
+          ${entries}
+
+          } // namespace resource
+
+      - file: ./${app-font}-resource.cpp
+        entry: |
+          const std::array<unsigned char, ${byte-count}> ${ident} = {
+          ${bytes}
+          };
+        content: |
+          ${cpp-head}
+          #include "common-icon-resource.hpp"
+
+          namespace resource {
+
+          ${entries}
+
+          } // namespace resource
+
+  - name: Prepare GLFW application icon resource
+    type: glfw-icon
+    source:
+      - ./app-icon/*-16.png
+      - ./app-icon/*-24.png
+      - ./app-icon/*-32.png
+      - ./app-icon/*-48.png
+      - ./app-icon/*-64.png
+    target: ./${app-icon}.glfw.cpp
+    ident: glfw_icon
+
+  - name: Prepare WIN32 icon resource
+    type: win32-icon
+    source:
+      - ./app-icon/*-16.png
+      - ./app-icon/*-24.png
+      - ./app-icon/*-32.png
+      - ./app-icon/*-48.png
+      - ./app-icon/*-64.png
+      - ./app-icon/*-128.png
+    target: ./${app-icon}.win32.ico

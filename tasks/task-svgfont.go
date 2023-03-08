@@ -3,7 +3,6 @@ package tasks
 import (
 	"bytes"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,58 +20,102 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// ParseCodepoint extracts unicode codepoint value from a string which can
-// be a decimal number or a hex (U+0000 or 0x0000 or 0X0000)
-func parseCodepoint(s string) (rune, error) {
-	var cp uint64
+func RunSVGFontTask(prj *Project, fields map[string]any) error {
+	sources := []string{}
+	target_fn := ""
+	codepoint := rune(0xf000)
+	height := 512
+	var optDescent *int
+	family := ""
+
 	var err error
-	if strings.HasPrefix(s, "U+") {
-		cp, err = strconv.ParseUint(s[2:], 16, 32)
-	} else if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
-		cp, err = strconv.ParseUint(s[2:], 16, 32)
+	for k, v := range fields {
+		switch k {
+		case "source":
+			sources, err = prj.GetStrings(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+
+		case "target":
+			if s, ok := v.(string); ok && s != "" {
+				target_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+
+		case "first-codepoint":
+			if s, ok := v.(string); ok {
+				codepoint, err = parseCodepoint(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			}
+
+		case "height", "font-height":
+			if v, ok := v.(int); ok && v > 0 {
+				height = v
+			} else {
+				return fmt.Errorf("%s: must be a positive integer", k)
+			}
+
+		case "descent", "font-descent":
+			if v, ok := v.(int); ok {
+				optDescent = &v
+			} else {
+				return fmt.Errorf("%s: must be an integer", k)
+			}
+
+		case "family", "family-name":
+			if s, ok := v.(string); ok && s != "" {
+				family = s
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+
+		default:
+			fmt.Printf("warning: unknown field '%s'\n", k)
+		}
+	}
+
+	var descent = 0
+	if optDescent != nil {
+		descent = *optDescent
 	} else {
-		cp, err = strconv.ParseUint(s, 10, 32)
+		descent = height / 4
+		if prj.Verbose {
+			fmt.Printf("assigning descent value %d\n", descent)
+		}
 	}
-	if err != nil {
-		return 0, fmt.Errorf("invalid codepoint value %q, %w", s, err)
-	}
-	return rune(cp), nil
-}
 
-func (prj *Project) ComposeSVGFilesIntoSVGFont(task *Task) error {
-	sources := task.GetSources()
+	if target_fn == "" {
+		return fmt.Errorf("missing field: target")
+	}
+
 	if len(sources) == 0 {
-		return errors.New("missing sources")
-	}
-	target := task.SvgTarget
-	if target == nil {
-		return errors.New("missing svg-target section")
-	}
-	if target.File == "" {
-		return errors.New("missing svg-target.file")
-	}
-	if target.FirstCodePoint == "" {
-		return errors.New("missing svg-target.first-codepoint")
+		return fmt.Errorf("missing field: source")
 	}
 
-	cp, err := parseCodepoint(target.FirstCodePoint)
+	source_fns, err := prj.AbsExistingPaths(sources)
 	if err != nil {
-		return err
+		return fmt.Errorf("source: %w", err)
+	} else if len(source_fns) == 0 {
+		return fmt.Errorf("no sources found")
 	}
-
-	src_fns := prj.AbsExistingPaths(sources)
-	dst_fn := prj.AbsPath(target.File)
 
 	glyphs := []*Glyph{}
 
 	maxPathLength := 0
-	for _, fn := range src_fns {
+	for _, fn := range source_fns {
 		if len(fn) > maxPathLength {
 			maxPathLength = len(fn)
 		}
 	}
 
-	for _, fn := range src_fns {
+	for _, fn := range source_fns {
 		gname := RemoveExtension(filepath.Base(fn))
 		gname = MakeIdentStr(gname)
 
@@ -97,33 +140,26 @@ func (prj *Project) ComposeSVGFilesIntoSVGFont(task *Task) error {
 
 	// assign codepoints
 	for _, g := range glyphs {
-		g.CodePoint = rune(cp)
-		cp++
-	}
-
-	height := 512
-	if target.Height != nil {
-		height = *target.Height
-	}
-	descent := 128
-	if target.Descent != nil {
-		descent = *target.Descent
+		g.CodePoint = codepoint
+		codepoint++
 	}
 
 	ascent := height - descent
-	familyname := target.Family
-	if familyname == "" {
-		familyname = filepath.Base(dst_fn)
-		familyname = familyname[:len(familyname)-len(filepath.Ext(familyname))]
+	if family == "" {
+		family = filepath.Base(target_fn)
+		family = family[:len(family)-len(filepath.Ext(family))]
+		if prj.Verbose {
+			fmt.Printf("assigning family name: %s\n", family)
+		}
 	}
 	out := bytes.Buffer{}
-	err = composeGlyphsIntoSVGFont(&out, glyphs, ascent, descent, familyname)
+	err = composeGlyphsIntoSVGFont(&out, glyphs, ascent, descent, family)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("writing %s ... ", dst_fn)
-	err = os.WriteFile(dst_fn, out.Bytes(), 0x666)
+	fmt.Printf("writing %s ... ", target_fn)
+	err = os.WriteFile(target_fn, out.Bytes(), 0666)
 	if err == nil {
 		fmt.Printf("SUCCEEDED\n")
 	} else {
@@ -144,7 +180,7 @@ type Glyph struct {
 }
 
 func readSVGFileAsGlyph(fn string) (*Glyph, error) {
-	data, err := ioutil.ReadFile(fn)
+	data, err := os.ReadFile(fn)
 	if err != nil {
 		return nil, err
 	}
@@ -254,80 +290,108 @@ func composeGlyphsIntoSVGFont(out io.Writer, glyphs []*Glyph,
 	return nil
 }
 
-func (prj *Project) CodeGenGlyphLookup(task *Task) error {
-	if task.Source == "" {
-		return errors.New("missing source")
-	}
-	target := task.HppTarget
-	if target == nil {
-		return errors.New("missing hpp-target")
-	}
-	if target.File == "" {
-		return errors.New("missing hpp-target.file")
-	}
-	if target.Content == "" {
-		return errors.New("missing hpp-target.content")
-	}
-	if target.Entry == "" {
-		return errors.New("missing hpp-target.entry")
+func RunGlyphNamesTask(prj *Project, fields map[string]any) error {
+	source_fn := ""
+	targets := []*Target{}
+
+	var err error
+	for k, v := range fields {
+		switch k {
+		case "source":
+			if s, ok := v.(string); ok && s != "" {
+				source_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+
+		case "target":
+			targets, err = prj.GetTargets(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			if len(targets) == 0 {
+				return fmt.Errorf("%s: must not be empty", k)
+			}
+
+		default:
+			fmt.Printf("warning: unknown field '%s'\n", k)
+		}
 	}
 
-	svg_fn := prj.AbsPath(task.Source)
-	hpp_fn := prj.AbsPath(target.File)
+	if source_fn == "" {
+		return fmt.Errorf("missing field: source")
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("missing field: target")
+	}
 
 	if prj.Verbose {
-		fmt.Printf("reading %q\n", svg_fn)
+		fmt.Printf("reading %q\n", source_fn)
 	}
 
-	buf := bytes.Buffer{}
-	out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
-
-	globalVars := maps.Clone(prj.Vars)
-	err := generateSVGFontHPP(out, svg_fn, globalVars, target.Content, target.Entry)
+	glyphs, err := extractNamedCodepoints(source_fn)
 	if err != nil {
 		return err
 	}
-	out.Flush()
 
-	fmt.Printf("writing %s ... ", hpp_fn)
-	err = os.WriteFile(hpp_fn, buf.Bytes(), 0x666)
-	if err == nil {
-		fmt.Printf("SUCCEEDED\n")
-	} else {
-		fmt.Printf("FAILED\n")
+	for _, t := range targets {
+		buf := bytes.Buffer{}
+		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+		err = codegenGlyphNames(out, glyphs, maps.Clone(prj.Vars), t.Content, t.Entry)
+		if err != nil {
+			return err
+		}
+		out.Flush()
+
+		fmt.Printf("writing %s ... ", t.File)
+		err = os.WriteFile(t.File, buf.Bytes(), 0666)
+		if err == nil {
+			fmt.Printf("SUCCEEDED\n")
+		} else {
+			fmt.Printf("FAILED\n")
+		}
 	}
 
 	return err
 }
 
-type SVGFont struct {
-	XMLName xml.Name    `xml:"svg"`
-	Glyphs  []*SVGGlyph `xml:"defs>font>glyph"`
-}
-
-type SVGGlyph struct {
+type NamedCodepoint struct {
 	Name    string `xml:"glyph-name,attr"`
 	Unicode string `xml:"unicode,attr"`
 }
 
-func generateSVGFontHPP(out io.Writer, svg_fn string,
-	global_vars map[string]string,
-	content_template, entry_template string) error {
-
-	buf, err := ioutil.ReadFile(svg_fn)
+func extractNamedCodepoints(source_fn string) (glyphs []*NamedCodepoint, err error) {
+	var buf []byte
+	buf, err = ioutil.ReadFile(source_fn)
 	if err != nil {
-		return err
+		return
 	}
-	font := &SVGFont{}
+
+	// implemented: support for glyph name extraction from SVG font
+	// todo: support for glyph name extraction from ttf/otf file
+
+	type SVGFontLoader struct {
+		XMLName xml.Name          `xml:"svg"`
+		Glyphs  []*NamedCodepoint `xml:"defs>font>glyph"`
+	}
+
+	font := &SVGFontLoader{}
 	err = xml.Unmarshal(buf, &font)
 	if err != nil {
-		return err
+		return
 	}
 
+	return font.Glyphs, nil
+}
+
+func codegenGlyphNames(out io.Writer, glyphs []*NamedCodepoint, globalVars map[string]string, contentTemplate, entryTemplate string) error {
 	first := true
 	cpmin := rune(0)
 	cpmax := cpmin
-	for _, g := range font.Glyphs {
+	for _, g := range glyphs {
 		runes := []rune(g.Unicode)
 		if len(runes) != 1 {
 			continue
@@ -346,12 +410,9 @@ func generateSVGFontHPP(out io.Writer, svg_fn string,
 			}
 		}
 	}
-	if first {
-		return errors.New("no codepoints found")
-	}
 
 	entryLines := []string{}
-	for _, g := range font.Glyphs {
+	for _, g := range glyphs {
 		runes := []rune(g.Unicode)
 
 		if len(runes) != 1 {
@@ -368,11 +429,12 @@ func generateSVGFontHPP(out io.Writer, svg_fn string,
 		entryVars := map[string]string{
 			"name":    g.Name,
 			"ident":   MakeIdentStr(g.Name),
-			"unicode": hex,
+			"hex":     hex,
+			"unicode": "U+" + hex,
 			"escaped": escaped,
 		}
 
-		line, err := ExpandVariables(entry_template, entryVars)
+		line, err := ExpandVariables(entryTemplate, entryVars)
 		if err != nil {
 			return fmt.Errorf("entry template: %w", err)
 		}
@@ -380,11 +442,11 @@ func generateSVGFontHPP(out io.Writer, svg_fn string,
 		entryLines = append(entryLines, line)
 	}
 
-	global_vars["codepoint-min"] = fmt.Sprintf("%X", cpmin)
-	global_vars["codepoint-max"] = fmt.Sprintf("%X", cpmax)
-	global_vars["entries"] = strings.Join(entryLines, "\n")
+	globalVars["codepoint-min"] = fmt.Sprintf("%X", cpmin)
+	globalVars["codepoint-max"] = fmt.Sprintf("%X", cpmax)
+	globalVars["entries"] = strings.Join(entryLines, "\n")
 
-	fileContent, err := ExpandVariables(content_template, global_vars)
+	fileContent, err := ExpandVariables(contentTemplate, globalVars)
 	if err != nil {
 		return fmt.Errorf("hpp-template: %w", err)
 	}
@@ -393,28 +455,51 @@ func generateSVGFontHPP(out io.Writer, svg_fn string,
 	return err
 }
 
-func (prj *Project) ConvertSVGFontToTTF(task *Task) error {
-	if task.Source == "" {
-		return errors.New("missing source")
-	}
-	target := task.TtfTarget
-	if target == nil {
-		return errors.New("missing ttf-target")
-	}
-	if target.File == "" {
-		return errors.New("missing 'target' or 'targets' field")
+func RunTTFTask(prj *Project, fields map[string]any) error {
+	source_fn := ""
+	target_fn := ""
+
+	var err error
+	for k, v := range fields {
+		switch k {
+		case "source":
+			if s, ok := v.(string); ok && s != "" {
+				source_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("source: must be a non-empty string")
+			}
+
+		case "target":
+			if s, ok := v.(string); ok && s != "" {
+				target_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+		default:
+			fmt.Printf("warning: unknown field '%s'\n", k)
+		}
 	}
 
-	svg_fn := prj.AbsPath(task.Source)
-	ttf_fn := prj.AbsPath(target.File)
+	if source_fn == "" {
+		return fmt.Errorf("missing field: source")
+	}
+	if target_fn == "" {
+		return fmt.Errorf("missing field: target")
+	}
 
 	if prj.Verbose {
-		fmt.Printf("source %q\n", svg_fn)
-		fmt.Printf("target %q\n", ttf_fn)
+		fmt.Printf("source %q\n", source_fn)
+		fmt.Printf("target %q\n", target_fn)
 	}
 
 	cmd := exec.Command("svg2ttf", "--version")
-	_, err := cmd.CombinedOutput()
+	_, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Failed to execute svg2ttf utility\n")
 		log.Printf("Please make sure it is installed:\n")
@@ -422,7 +507,7 @@ func (prj *Project) ConvertSVGFontToTTF(task *Task) error {
 		log.Printf("you will need to have node.js installed\n")
 		return err
 	}
-	cmd = exec.Command("svg2ttf", svg_fn, ttf_fn)
+	cmd = exec.Command("svg2ttf", source_fn, target_fn)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
@@ -431,6 +516,24 @@ func (prj *Project) ConvertSVGFontToTTF(task *Task) error {
 	}
 
 	return nil
+}
+
+// parseCodepoint extracts unicode codepoint value from a string which can
+// be a decimal number or a hex (U+0000 or 0x0000 or 0X0000)
+func parseCodepoint(s string) (rune, error) {
+	var cp uint64
+	var err error
+	if strings.HasPrefix(s, "U+") {
+		cp, err = strconv.ParseUint(s[2:], 16, 32)
+	} else if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		cp, err = strconv.ParseUint(s[2:], 16, 32)
+	} else {
+		cp, err = strconv.ParseUint(s, 10, 32)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("invalid codepoint value %q: %w", s, err)
+	}
+	return rune(cp), nil
 }
 
 func RemoveExtension(fn string) string {

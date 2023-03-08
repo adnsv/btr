@@ -36,7 +36,7 @@ func main() {
 			fmt.Printf("CWD: %s\n", cwd)
 		}
 
-		config, err := tasks.LoadConfig(absfn)
+		config, err := tasks.LoadProject(absfn)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -45,13 +45,13 @@ func main() {
 			switch ext {
 			case ".yaml", ".yml":
 				buf, _ := yaml.Marshal(*config)
-				err = os.WriteFile(convert_to, buf, 0655)
+				err = os.WriteFile(convert_to, buf, 0666)
 				if err != nil {
 					log.Fatal(err)
 				}
 			case ".json", ".jsn":
 				buf, _ := json.MarshalIndent(config, "", "\t")
-				err = os.WriteFile(convert_to, buf, 0655)
+				err = os.WriteFile(convert_to, buf, 0666)
 				if err != nil {
 					log.Fatal(err)
 				}
