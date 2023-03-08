@@ -1,26 +1,31 @@
 package tasks
 
 import (
+	"log"
 	"path/filepath"
 )
 
 // Task contains a description and all the parameters required for execution of
 // a task
 type Task struct {
-	Label   string      `yaml:"label,omitempty"`
-	Type    string      `yaml:"type,omitempty"`
-	Source  string      `yaml:"source,omitempty"`
-	Sources []string    `yaml:"sources,omitempty"`
-	Target  string      `yaml:"target,omitempty"`
-	Targets []string    `yaml:"targets,omitempty"`
-	Font    *FontConfig `yaml:"font,omitempty"`
-	Format  string      `yaml:"format,omitempty"`
+	Label   string   `yaml:"label,omitempty"`
+	Type    string   `yaml:"type,omitempty"`
+	Source  string   `yaml:"source,omitempty"`
+	Sources []string `yaml:"sources,omitempty"`
+	Format  string   `yaml:"format,omitempty"`
 
-	HppTarget *HppTarget `yaml:"hpp-target"`
-	CppTarget *CppTarget `yaml:"cpp-target"`
+	TtfTarget *TtfTarget `yaml:"ttf-target,omitempty"`
+	SvgTarget *SvgTarget `yaml:"svg-target,omitempty"`
+	HppTarget *HppTarget `yaml:"hpp-target,omitempty"`
+	CppTarget *CppTarget `yaml:"cpp-target,omitempty"`
 }
 
-type FontConfig struct {
+type TtfTarget struct {
+	File string `yaml:"file"`
+}
+
+type SvgTarget struct {
+	File           string `yaml:"file"`
 	FirstCodePoint string `yaml:"first-codepoint"`
 	Height         *int   `yaml:"height"`
 	Descent        *int   `yaml:"descent"`
@@ -49,57 +54,43 @@ func (t *Task) GetSources() []string {
 	return ret
 }
 
-// GetTargets combines Source and Sources into a single list
-func (t *Task) GetTargets() []string {
-	ret := []string{}
-	if len(t.Target) > 0 {
-		ret = append(ret, t.Target)
-	}
-	for _, t := range t.Targets {
-		if len(t) > 0 {
-			ret = append(ret, t)
-		}
-	}
-	return ret
-}
-
 // AbsExistingPaths gets all the actual filepaths from sources, processes
 // wildcards and expands all paths relative to basedir
 // returns paths only for existing filesystem entries
-func AbsExistingPaths(basedir string, paths []string) ([]string, error) {
+func (prj *Project) AbsExistingPaths(paths []string) []string {
 	var err error
 	ret := []string{}
 	for _, it := range paths {
 		path := it
 		if !filepath.IsAbs(path) {
-			path, err = filepath.Abs(filepath.Join(basedir, it))
+			path, err = filepath.Abs(filepath.Join(prj.BaseDir, it))
 			if err != nil {
-				return nil, err
+				log.Fatal(err)
 			}
 		}
 		path = filepath.Clean(path)
 		matches, err := filepath.Glob(path)
 		if err != nil {
-			return nil, err
+			log.Fatal(err)
 		}
 		for _, fn := range matches {
 			ret = append(ret, filepath.Clean(fn))
 		}
 	}
-	return ret, nil
+	return ret
 }
 
 // AbsPaths converts paths to absolute paths
 // non-absolute paths are expanded relative to basedir
-func AbsPaths(basedir string, paths []string) ([]string, error) {
+func (prj *Project) AbsPaths(paths []string) []string {
 	var err error
 	ret := []string{}
 	for _, it := range paths {
 		path := it
 		if !filepath.IsAbs(path) {
-			path, err = filepath.Abs(filepath.Join(basedir, it))
+			path, err = filepath.Abs(filepath.Join(prj.BaseDir, it))
 			if err != nil {
-				return nil, err
+				log.Fatal(err)
 			}
 		}
 		path = filepath.Clean(path)
@@ -107,5 +98,16 @@ func AbsPaths(basedir string, paths []string) ([]string, error) {
 			ret = append(ret, path)
 		}
 	}
-	return ret, nil
+	return ret
+}
+
+func (prj *Project) AbsPath(fn string) string {
+	if filepath.IsAbs(fn) {
+		return fn
+	}
+	fn, err := filepath.Abs(filepath.Join(prj.BaseDir, fn))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return fn
 }

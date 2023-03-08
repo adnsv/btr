@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Config struct {
+type Project struct {
 	BaseDir string            `yaml:"-"`
 	Verbose bool              `yaml:"-"`
 	Version string            `yaml:"version"`
@@ -18,15 +18,15 @@ type Config struct {
 	Tasks   []*Task           `yaml:"tasks"`
 }
 
-func LoadConfig(fn string) (*Config, error) {
+func LoadProject(fn string) (*Project, error) {
 	buf, err := ioutil.ReadFile(fn)
 	if err != nil {
 		return nil, err
 	}
-	config := &Config{}
+	prj := &Project{}
 	ext := strings.ToLower(filepath.Ext(fn))
 	if ext == ".yaml" || ext == ".yml" {
-		err = yaml.Unmarshal(buf, &config)
+		err = yaml.Unmarshal(buf, &prj)
 	} else if ext == ".json" {
 		return nil, fmt.Errorf("json format is no longer supported")
 	} else {
@@ -36,24 +36,24 @@ func LoadConfig(fn string) (*Config, error) {
 		return nil, fmt.Errorf("failed to load config from %q:\n%s",
 			fn, err)
 	}
-	config.BaseDir, err = filepath.Abs(filepath.Dir(fn))
+	prj.BaseDir, err = filepath.Abs(filepath.Dir(fn))
 	if err != nil {
 		return nil, fmt.Errorf("config error: %w", err)
 	}
-	return config, nil
+	return prj, nil
 }
 
-func (c *Config) Run() error {
-	if len(c.Tasks) == 0 {
+func (prj *Project) Run() error {
+	if len(prj.Tasks) == 0 {
 		return fmt.Errorf("No tasks specified")
 	}
-	for i, t := range c.Tasks {
+	for i, t := range prj.Tasks {
 		s := ""
 		if t.Label != "" {
 			s = fmt.Sprintf(": '%s'", t.Label)
 		}
-		fmt.Printf("Task %d of %d%s\n", i+1, len(c.Tasks), s)
-		err := c.RunTask(t)
+		fmt.Printf("Task %d of %d%s\n", i+1, len(prj.Tasks), s)
+		err := prj.RunTask(t)
 		if err != nil {
 			return err
 		}
@@ -61,34 +61,34 @@ func (c *Config) Run() error {
 	return nil
 }
 
-func (c *Config) RunTask(t *Task) error {
+func (prj *Project) RunTask(t *Task) error {
 	if t.Type == "" {
 		log.Printf("missing 'type' field\n")
 		return nil
 	}
-	if c.Verbose {
+	if prj.Verbose {
 		fmt.Printf("task type: %s\n", t.Type)
 	}
 
 	switch t.Type {
 	case "svgfont.make":
-		return RunSVGFontMake(t, c)
+		return prj.ComposeSVGFilesIntoSVGFont(t)
 	case "svgfont.hpp":
-		return RunSVGFontHPP(t, c)
+		return prj.CodeGenGlyphLookup(t)
 	case "svgfont.ttf":
-		return RunSVGFontTTF(t, c)
+		return prj.ConvertSVGFontToTTF(t)
 	case "binpack.c++":
-		return RunBinPackCPP(t, c)
+		return RunBinPackCPP(t, prj)
 	case "imgpack.c++":
-		return RunImgPackCPP(t, c)
+		return RunImgPackCPP(t, prj)
 	case "imgpack.c++.types":
-		return RunImgPackCPPTypes(t, c)
+		return RunImgPackCPPTypes(t, prj)
 	case "dir.make":
-		return RunDir(t, c, "make")
+		return RunDir(t, prj, "make")
 	case "dir.clean":
-		return RunDir(t, c, "clean")
+		return RunDir(t, prj, "clean")
 	case "icon.win32":
-		return RunIcon(t, c, "win32")
+		return RunIcon(t, prj, "win32")
 	default:
 		log.Printf("unsupported task type '%s'", t.Type)
 	}

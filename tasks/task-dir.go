@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func RunDir(task *Task, config *Config, cmd string) error {
+func RunDir(task *Task, config *Project, cmd string) error {
 	targets := task.GetTargets()
 	if len(targets) == 0 {
 		return errors.New("missing target paths\nspecify \"target\": \"path\" or \"targets\": [\"path\",...] in the task description")

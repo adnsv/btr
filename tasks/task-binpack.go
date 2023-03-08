@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -12,56 +13,45 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func RunBinPackCPP(task *Task, config *Config) error {
+func (prj *Project) RunBinPackCPP(task *Task) error {
 	var err error
-	targets := task.Targets
-	if len(targets) != 2 {
-		return errors.New("missing or invalid targets\nplease specify two targets \"targets\": [\"filepath.hpp\", \"filepath.cpp\"] in the task description")
-	}
-	sources := task.GetSources()
+	src_fns := prj.AbsExistingPaths(task.GetSources())
 	if len(sources) == 0 {
-		return errors.New("missing 'source' field")
-	}
-	filepaths, err := AbsExistingPaths(config.BaseDir, sources)
-	if err != nil {
-		return err
-	}
-	if task.HppTemplate == "" {
-		return errors.New("missing 'hpp-template' field")
-	}
-	if task.CppTemplate == "" {
-		return errors.New("missing 'cpp-template' field")
-	}
-	if task.HppEntryTemplate == "" {
-		return errors.New("missing 'hpp-entry-template' field")
-	}
-	if task.CppEntryTemplate == "" {
-		return errors.New("missing 'cpp-entry-template' field")
+		return errors.New("missing source")
 	}
 
-	hpath := targets[0]
-	cpath := targets[1]
-	if !filepath.IsAbs(hpath) {
-		hpath = filepath.Join(config.BaseDir, hpath)
-		hpath, err = filepath.Abs(hpath)
-		if err != nil {
-			return err
-		}
+	if task.HppTarget == nil {
+		return errors.New("missing 'hpp-target")
 	}
-	if !filepath.IsAbs(cpath) {
-		cpath = filepath.Join(config.BaseDir, cpath)
-		cpath, err = filepath.Abs(cpath)
-		if err != nil {
-			return err
-		}
+	if task.HppTarget.File == "" {
+		return errors.New("missing 'hpp-target.file")
 	}
-	hpath = filepath.Clean(hpath)
-	cpath = filepath.Clean(cpath)
+	if task.HppTarget.Entry == "" {
+		return errors.New("missing 'hpp-target.entry")
+	}
+	if task.HppTarget.Content == "" {
+		return errors.New("missing 'hpp-target.content")
+	}
+	if task.CppTarget == nil {
+		return errors.New("missing 'cpp-target")
+	}
+	if task.CppTarget.File == "" {
+		return errors.New("missing 'cpp-target.file")
+	}
+	if task.CppTarget.Entry == "" {
+		return errors.New("missing 'cpp-target.entry")
+	}
+	if task.CppTarget.Content == "" {
+		return errors.New("missing 'cpp-target.content")
+	}
+
+	hpp_fn := prj.AbsPath(task.HppTarget.File)
+	cpp_fn := prj.AbsPath(task.CppTarget.File)
 
 	hpp_entries := []string{}
 	cpp_entries := []string{}
-	for _, path := range filepaths {
-		if config.Verbose {
+	for _, path := range src_fns {
+		if prj.Verbose {
 			fmt.Printf("loading %q\n", path)
 		}
 
@@ -88,43 +78,57 @@ func RunBinPackCPP(task *Task, config *Config) error {
 			"ident":      ident,
 		}
 
-		hpp_entry, err := ExpandVariables(task.HppEntryTemplate, entry_vars)
+		hpp_entry, err := ExpandVariables(task.HppTarget.Entry, entry_vars)
 		if err != nil {
-			return fmt.Errorf("hpp-entry-template: %w", err)
+			return fmt.Errorf("hpp-target.entry: %w", err)
 		}
-		cpp_entry, err := ExpandVariables(task.CppEntryTemplate, entry_vars)
+		cpp_entry, err := ExpandVariables(task.CppTarget.Entry, entry_vars)
 		if err != nil {
-			return fmt.Errorf("cpp-entry-template: %w", err)
+			return fmt.Errorf("cpp-target.entry: %w", err)
 		}
 		hpp_entries = append(hpp_entries, hpp_entry)
 		cpp_entries = append(cpp_entries, cpp_entry)
 	}
 
 	{
-		vars := maps.Clone(config.Vars)
+		vars := maps.Clone(prj.Vars)
 		vars["entries"] = strings.Join(hpp_entries, "\n\n")
-		cont, err := ExpandVariables(task.HppTemplate, vars)
+		cont, err := ExpandVariables(task.HppTarget.Content, vars)
 		if err != nil {
 			return fmt.Errorf("hpp-template: %w", err)
 		}
 		buf := bytes.Buffer{}
 		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+		fmt.Fprint(out, cont)
+		fmt.Printf("writing %s ... ", hpp_fn)
+		err = os.WriteFile(hpp_fn, buf.Bytes(), 0x666)
+		if err == nil {
+			fmt.Printf("SUCCEEDED\n")
+		} else {
+			fmt.Printf("FAILED\n")
+			return err
+		}
 
 	}
-
-	cpp_buf := bytes.Buffer{}
-	cpp_out := tabwriter.NewWriter(&cpp_buf, 0, 4, 1, ' ', 0)
-
-	hpp.EndCppNamespace(namespace)
-	hpp.WriteLines(task.Codegen.BottomMatter.Lines("hpp")...)
-	hpp.WriteLines(config.Codegen.BottomMatter.Lines("hpp")...)
-	cpp.EndCppNamespace(namespace)
-	hpp.WriteLines(task.Codegen.BottomMatter.Lines("cpp")...)
-	hpp.WriteLines(config.Codegen.BottomMatter.Lines("cpp")...)
-
-	err = hpp.WriteOut()
-	if err != nil {
-		return err
+	{
+		vars := maps.Clone(prj.Vars)
+		vars["entries"] = strings.Join(cpp_entries, "\n\n")
+		cont, err := ExpandVariables(task.CppTarget.Content, vars)
+		if err != nil {
+			return fmt.Errorf("cpp-template: %w", err)
+		}
+		buf := bytes.Buffer{}
+		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+		fmt.Fprint(out, cont)
+		fmt.Printf("writing %s ... ", cpp_fn)
+		err = os.WriteFile(cpp_fn, buf.Bytes(), 0x666)
+		if err == nil {
+			fmt.Printf("SUCCEEDED\n")
+		} else {
+			fmt.Printf("FAILED\n")
+			return err
+		}
 	}
-	return cpp.WriteOut()
+
+	return err
 }

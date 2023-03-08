@@ -26,7 +26,7 @@ type BITMAPINFOHEADER struct {
 	BiClrImportant  uint32
 }
 
-func RunIcon(task *Task, config *Config, iconType string) error {
+func RunIcon(task *Task, config *Project, iconType string) error {
 	var err error
 
 	dst := task.Target

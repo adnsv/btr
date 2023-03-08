@@ -91,7 +91,7 @@ func loadImage(path string, name string, wantFormat string) (*imageEntry, error)
 	return ret, nil
 }
 
-func RunImgPackCPP(task *Task, config *Config) error {
+func RunImgPackCPP(task *Task, config *Project) error {
 	var err error
 	targets := task.Targets
 	if len(targets) != 2 {
@@ -238,7 +238,7 @@ func RunImgPackCPP(task *Task, config *Config) error {
 
 }
 
-func RunImgPackCPPTypes(task *Task, config *Config) error {
+func RunImgPackCPPTypes(task *Task, config *Project) error {
 	var err error
 	dstpath := task.Target
 	if len(dstpath) == 0 {
