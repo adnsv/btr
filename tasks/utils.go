@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"unicode"
 	"unicode/utf8"
@@ -75,3 +76,92 @@ func naturalCompare(a, b string) int {
 		return 0
 	}
 }
+
+func identStart(c rune) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
+}
+
+func identChar(c rune) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'
+}
+
+func RemoveExtension(fn string) string {
+	ext := filepath.Ext(fn)
+	return fn[:len(fn)-len(ext)]
+}
+
+func MakeCPPIdentStr(s string) string {
+	if s == "" {
+		return "_"
+	}
+
+	ret := ""
+	for i, r := range s {
+		if i == 0 {
+			if identStart(r) {
+				ret += string(r)
+			} else {
+				ret += "_"
+			}
+		} else {
+			if identChar(r) {
+				ret += string(r)
+			} else {
+				ret += "_"
+			}
+		}
+	}
+	for _, kw := range cppReservedKeywords {
+		if s == kw {
+			s += "_"
+			break
+		}
+	}
+	return s
+}
+
+var cppReservedKeywords = [...]string{
+	"auto",
+	"break",
+	"case",
+	"char",
+	"const",
+	"continue",
+	"default",
+	"do",
+	"double",
+	"else",
+	"enum",
+	"extern",
+	"float",
+	"for",
+	"goto",
+	"if",
+	"inline",
+	"int",
+	"long",
+	"register",
+	"restrict",
+	"return",
+	"short",
+	"signed",
+	"sizeof",
+	"static",
+	"struct",
+	"switch",
+	"typedef",
+	"union",
+	"unsigned",
+	"void",
+	"volatile",
+	"while",
+	"_Alignas ",
+	"_Alignof",
+	"_Atomic",
+	"_Bool",
+	"_Complex ",
+	"_Generic",
+	"_Imaginary",
+	"_Noreturn",
+	"_Static_assert",
+	"_Thread_local"}

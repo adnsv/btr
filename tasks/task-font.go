@@ -426,14 +426,15 @@ func codegenGlyphNames(out io.Writer, glyphs []*NamedCodepoint, globalVars map[s
 		for i := 0; i < len(u8); i++ {
 			escaped += fmt.Sprintf(`\x%x`, u8[i])
 		}
-		hex := fmt.Sprintf("%X", cp)
+		hex := fmt.Sprintf("%.4X", cp)
 
 		entryVars := map[string]string{
-			"name":    g.Name,
-			"ident":   MakeIdentStr(g.Name),
-			"hex":     hex,
-			"unicode": "U+" + hex,
-			"escaped": escaped,
+			"name":             g.Name,
+			"ident-cpp":        MakeCPPIdentStr(g.Name),
+			"unicode":          "U+" + hex,
+			"unicode-hex":      hex,
+			"utf8":             u8,
+			"utf8-escaped-cpp": escaped,
 		}
 
 		line, err := ExpandVariables(entryTemplate, entryVars)
@@ -537,75 +538,3 @@ func parseCodepoint(s string) (rune, error) {
 	}
 	return rune(cp), nil
 }
-
-func RemoveExtension(fn string) string {
-	ext := filepath.Ext(fn)
-	return fn[:len(fn)-len(ext)]
-}
-
-func MakeIdentStr(s string) string {
-	s = strings.ReplaceAll(s, "-", "_")
-	if s == "" {
-		return "_"
-	}
-	if !identStart(s[0]) {
-		s = "_" + s
-	}
-	for _, kw := range reservedKeywords {
-		if s == kw {
-			s += "_"
-			break
-		}
-	}
-	return s
-}
-
-func identStart(c byte) bool {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
-}
-
-var reservedKeywords = [...]string{
-	"auto",
-	"break",
-	"case",
-	"char",
-	"const",
-	"continue",
-	"default",
-	"do",
-	"double",
-	"else",
-	"enum",
-	"extern",
-	"float",
-	"for",
-	"goto",
-	"if",
-	"inline",
-	"int",
-	"long",
-	"register",
-	"restrict",
-	"return",
-	"short",
-	"signed",
-	"sizeof",
-	"static",
-	"struct",
-	"switch",
-	"typedef",
-	"union",
-	"unsigned",
-	"void",
-	"volatile",
-	"while",
-	"_Alignas ",
-	"_Alignof",
-	"_Atomic",
-	"_Bool",
-	"_Complex ",
-	"_Generic",
-	"_Imaginary",
-	"_Noreturn",
-	"_Static_assert",
-	"_Thread_local"}

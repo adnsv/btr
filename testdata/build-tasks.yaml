@@ -1,4 +1,4 @@
-version: 2.0.0
+version: 0.4.0
 vars:
   "app-font-src": "./app-font/*.svg"
   "app-font": "app-font"
@@ -36,7 +36,7 @@ tasks:
     source: ${tmp-dir}/${app-font}.svg
     target:
       file: ./${app-font}-glyphs.hpp
-      entry: "char const* ${ident}\t= \"${escaped}\";\t// ${unicode} ${name}"
+      entry: "char const* ${ident-cpp}\t= \"${utf8-escaped-cpp}\";\t// ${unicode} ${name}"
       content: |
         ${hpp-head}
 
@@ -53,7 +53,7 @@ tasks:
     source: ${tmp-dir}/${app-font}.ttf
     target:
       - file: ./${app-font}-resource.hpp
-        entry: extern const std::array<unsigned char, ${byte-count}> ${ident};
+        entry: extern const std::array<unsigned char, ${byte-count}> ${ident-cpp};
         content: |
           ${hpp-head}
           #include <array>
@@ -66,8 +66,8 @@ tasks:
 
       - file: ./${app-font}-resource.cpp
         entry: |
-          const std::array<unsigned char, ${byte-count}> ${ident} = {
-          ${bytes}
+          const std::array<unsigned char, ${byte-count}> ${ident-cpp} = {
+          ${byte-content}
           };
         content: |
           ${cpp-head}

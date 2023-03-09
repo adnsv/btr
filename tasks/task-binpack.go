@@ -49,10 +49,10 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 	}
 
 	type blobInfo struct {
-		filename string
-		ident    string
-		data     []byte
-		bytestr  string
+		filename  string
+		ident_cpp string
+		data      []byte
+		bytestr   string
 	}
 
 	blobs := []*blobInfo{}
@@ -66,9 +66,7 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 		}
 
 		filename := filepath.Base(source_fn)
-		ident := strings.ToLower(filename)
-		ident = strings.ReplaceAll(ident, ".", "_")
-		ident = strings.ReplaceAll(ident, "-", "_")
+		ident_cpp := strings.ToLower(MakeCPPIdentStr(strings.ToLower(filename)))
 
 		bytestr := "    "
 		for i, b := range data {
@@ -77,7 +75,7 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 			}
 			bytestr += fmt.Sprintf("0x%.2x,", b)
 		}
-		blobs = append(blobs, &blobInfo{filename: filename, ident: ident, data: data, bytestr: bytestr})
+		blobs = append(blobs, &blobInfo{filename: filename, ident_cpp: ident_cpp, data: data, bytestr: bytestr})
 	}
 
 	for _, target := range targets {
@@ -86,9 +84,9 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 		for _, blob := range blobs {
 			entry_vars := maps.Clone(prj.Vars)
 			entry_vars["byte-count"] = fmt.Sprintf("%d", len(blob.data))
-			entry_vars["bytes"] = blob.bytestr
+			entry_vars["byte-content"] = blob.bytestr
 			entry_vars["filename"] = blob.filename
-			entry_vars["ident"] = blob.ident
+			entry_vars["ident-cpp"] = blob.ident_cpp
 			entry, err := ExpandVariables(target.Entry, entry_vars)
 			if err != nil {
 				return err

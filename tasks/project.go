@@ -91,14 +91,14 @@ func (prj *Project) RunTask(t *Task) error {
 		err = RunDirTask(prj, t.Fields)
 	case "file":
 		err = RunFileTask(prj, t.Fields)
+	case "binpack":
+		err = RunBinpackTask(prj, t.Fields)
 	case "svgfont":
 		err = RunSVGFontTask(prj, t.Fields)
 	case "ttf":
 		err = RunTTFTask(prj, t.Fields)
 	case "glyph-names":
 		err = RunGlyphNamesTask(prj, t.Fields)
-	case "binpack":
-		err = RunBinpackTask(prj, t.Fields)
 	case "glfw-icon":
 		err = RunGLFWIconTask(prj, t.Fields)
 	case "win32-icon":
