@@ -427,10 +427,11 @@ func codegenGlyphNames(out io.Writer, glyphs []*NamedCodepoint, globalVars map[s
 			escaped += fmt.Sprintf(`\x%x`, u8[i])
 		}
 		hex := fmt.Sprintf("%.4X", cp)
+		ident_cpp := MakeCPPIdentStr(g.Name)
 
 		entryVars := map[string]string{
 			"name":             g.Name,
-			"ident-cpp":        MakeCPPIdentStr(g.Name),
+			"ident-cpp":        ident_cpp,
 			"unicode":          "U+" + hex,
 			"unicode-hex":      hex,
 			"utf8":             u8,

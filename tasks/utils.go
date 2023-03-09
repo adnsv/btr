@@ -117,7 +117,7 @@ func MakeCPPIdentStr(s string) string {
 			break
 		}
 	}
-	return s
+	return ret
 }
 
 var cppReservedKeywords = [...]string{
