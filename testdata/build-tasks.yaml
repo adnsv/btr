@@ -1,4 +1,4 @@
-version: 0.4.0
+version: 0.4.0-rc.1
 vars:
   "app-font-src": "./app-font/*.svg"
   "app-font": "app-font"
