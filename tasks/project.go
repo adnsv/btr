@@ -34,10 +34,10 @@ func LoadProject(fn string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	config := &Project{}
+	prj := &Project{}
 	ext := strings.ToLower(filepath.Ext(fn))
 	if ext == ".yaml" || ext == ".yml" {
-		err = yaml.Unmarshal(buf, &config)
+		err = yaml.Unmarshal(buf, &prj)
 	} else if ext == ".json" {
 		return nil, fmt.Errorf("json format is no longer supported")
 	} else {
@@ -47,11 +47,11 @@ func LoadProject(fn string) (*Project, error) {
 		return nil, fmt.Errorf("failed to load config from %q:\n%s",
 			fn, err)
 	}
-	config.BaseDir, err = filepath.Abs(filepath.Dir(fn))
+	prj.BaseDir, err = filepath.Abs(filepath.Dir(fn))
 	if err != nil {
 		return nil, fmt.Errorf("config error: %w", err)
 	}
-	return config, nil
+	return prj, nil
 }
 
 func (prj *Project) Run() error {
@@ -82,7 +82,7 @@ func (prj *Project) RunTask(t *Task) error {
 		return nil
 	}
 	if prj.Verbose {
-		fmt.Printf("task type: %s\n", t.Type)
+		fmt.Printf("- type: %s\n", t.Type)
 	}
 
 	var err error
@@ -117,7 +117,7 @@ func (prj *Project) RunTask(t *Task) error {
 // AbsExistingPaths gets all the actual filepaths from sources, processes
 // wildcards, (including doublestar) and expands all paths relative to basedir
 // returns paths only for existing filesystem entries.
-func (proj *Project) AbsExistingPaths(sources []string) ([]string, error) {
+func (prj *Project) AbsExistingPaths(sources []string) ([]string, error) {
 	var err error
 	ret := []string{}
 	set := map[string]struct{}{}
@@ -125,13 +125,13 @@ func (proj *Project) AbsExistingPaths(sources []string) ([]string, error) {
 		if s == "" {
 			continue
 		}
-		s, err = ExpandVariables(s, proj.Vars)
+		s, err = ExpandVariables(s, prj.Vars)
 		if err != nil {
 			return nil, err
 		}
 
 		if !filepath.IsAbs(s) {
-			s, err = filepath.Abs(filepath.Join(proj.BaseDir, s))
+			s, err = filepath.Abs(filepath.Join(prj.BaseDir, s))
 			if err != nil {
 				return nil, err
 			}
@@ -146,7 +146,7 @@ func (proj *Project) AbsExistingPaths(sources []string) ([]string, error) {
 			if _, exists := set[m]; exists {
 				continue
 			}
-			ret = append(ret, m)
+			ret = append(ret, filepath.ToSlash(m))
 			set[m] = struct{}{}
 		}
 	}
@@ -156,19 +156,19 @@ func (proj *Project) AbsExistingPaths(sources []string) ([]string, error) {
 
 // AbsPath converts path to absolute path
 // non-absolute path is expanded relative to basedir.
-func (proj *Project) AbsPath(path string) (string, error) {
-	path, err := ExpandVariables(path, proj.Vars)
+func (prj *Project) AbsPath(path string) (string, error) {
+	path, err := ExpandVariables(path, prj.Vars)
 	if err != nil {
 		return "", err
 	}
 	if filepath.IsAbs(path) {
-		return path, nil
+		return filepath.ToSlash(path), nil
 	}
-	p, err := filepath.Abs(filepath.Join(proj.BaseDir, path))
+	p, err := filepath.Abs(filepath.Join(prj.BaseDir, path))
 	if err != nil {
 		return "", err
 	}
-	return filepath.Clean(p), nil
+	return filepath.ToSlash(filepath.Clean(p)), nil
 }
 
 func ValidateIdent(s string) (string, error) {
@@ -191,7 +191,7 @@ type Target struct {
 	Content string
 }
 
-func (proj *Project) getTarget(m map[string]any) (*Target, error) {
+func (prj *Project) getTarget(m map[string]any) (*Target, error) {
 	t := &Target{}
 	var err error
 	for k, v := range m {
@@ -200,7 +200,7 @@ func (proj *Project) getTarget(m map[string]any) (*Target, error) {
 			if s, ok := v.(string); !ok || s == "" {
 				return nil, fmt.Errorf("%s: must be a non-empty string", k)
 			} else {
-				t.File, err = proj.AbsPath(s)
+				t.File, err = prj.AbsPath(s)
 				if err != nil {
 					return nil, fmt.Errorf("%s: %w", k, err)
 				}
@@ -233,10 +233,10 @@ func (proj *Project) getTarget(m map[string]any) (*Target, error) {
 	return t, nil
 }
 
-func (proj *Project) GetTargets(n any) ([]*Target, error) {
+func (prj *Project) GetTargets(n any) ([]*Target, error) {
 	tt := []*Target{}
 	if m, ok := n.(map[string]any); ok {
-		t, err := proj.getTarget(m)
+		t, err := prj.getTarget(m)
 		if err != nil {
 			return nil, err
 		}
@@ -244,7 +244,7 @@ func (proj *Project) GetTargets(n any) ([]*Target, error) {
 	} else if items, ok := n.([]any); ok {
 		for i, item := range items {
 			if m, ok := item.(map[string]any); ok {
-				t, err := proj.getTarget(m)
+				t, err := prj.getTarget(m)
 				if err != nil {
 					return nil, fmt.Errorf("[%d]: %w", i, err)
 				}
@@ -257,7 +257,7 @@ func (proj *Project) GetTargets(n any) ([]*Target, error) {
 	return tt, nil
 }
 
-func (proj *Project) GetStrings(v any) ([]string, error) {
+func (prj *Project) GetStrings(v any) ([]string, error) {
 	ret := []string{}
 	if s, ok := v.(string); ok {
 		ret = append(ret, s)

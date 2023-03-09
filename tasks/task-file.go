@@ -30,7 +30,7 @@ func RunFileTask(prj *Project, fields map[string]any) error {
 				return fmt.Errorf("%s: must be a string", k)
 			}
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
@@ -39,7 +39,7 @@ func RunFileTask(prj *Project, fields map[string]any) error {
 		return err
 	}
 
-	fmt.Printf("writing %s ... ", target_fn)
+	fmt.Printf("- writing %s ... ", target_fn)
 	err = os.WriteFile(target_fn, []byte(content), 0666)
 	if err == nil {
 		fmt.Printf("SUCCEEDED\n")

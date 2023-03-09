@@ -58,7 +58,7 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 	blobs := []*blobInfo{}
 	for _, source_fn := range source_fns {
 		if prj.Verbose {
-			fmt.Printf("loading %q\n", source_fn)
+			fmt.Printf("- reading: %s\n", source_fn)
 		}
 		data, err := os.ReadFile(source_fn)
 		if err != nil {
@@ -108,7 +108,7 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 		fmt.Fprint(out, content)
 		out.Flush()
 
-		fmt.Printf("writing %s ... ", target.File)
+		fmt.Printf("- writing %s ... ", target.File)
 		err = os.WriteFile(target.File, buf.Bytes(), 0666)
 		if err == nil {
 			fmt.Printf("SUCCEEDED\n")

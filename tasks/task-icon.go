@@ -152,7 +152,7 @@ func RunGLFWIconTask(prj *Project, fields map[string]any) error {
 			}
 
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
@@ -182,7 +182,7 @@ func RunGLFWIconTask(prj *Project, fields map[string]any) error {
 		return err
 	}
 	out.Flush()
-	fmt.Printf("writing %s ... ", target_fn)
+	fmt.Printf("- writing %s ... ", target_fn)
 	err = os.WriteFile(target_fn, buf.Bytes(), 0666)
 	if err == nil {
 		fmt.Printf("SUCCEEDED\n")
@@ -249,7 +249,7 @@ func RunWin32IconTask(prj *Project, fields map[string]any) error {
 			}
 
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
@@ -277,7 +277,7 @@ func RunWin32IconTask(prj *Project, fields map[string]any) error {
 		return err
 	}
 
-	fmt.Printf("writing %s ... ", target_fn)
+	fmt.Printf("- writing %s ... ", target_fn)
 	err = os.WriteFile(target_fn, buf, 0666)
 	if err == nil {
 		fmt.Printf("SUCCEEDED\n")

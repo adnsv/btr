@@ -77,7 +77,7 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 			}
 
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
@@ -86,9 +86,11 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 		descent = *optDescent
 	} else {
 		descent = height / 4
-		if prj.Verbose {
-			fmt.Printf("assigning descent value %d\n", descent)
-		}
+	}
+
+	if prj.Verbose {
+		fmt.Printf("- font height:  %d\n", height)
+		fmt.Printf("- font descent: %d\n", descent)
 	}
 
 	if target_fn == "" {
@@ -124,7 +126,7 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 			if n < 1 {
 				n = 1
 			}
-			fmt.Printf("loading %q%s-> %s\n", fn, strings.Repeat(" ", n), gname)
+			fmt.Printf("- reading: %s%s-> %s\n", fn, strings.Repeat(" ", n), gname)
 		}
 		g, err := readSVGFileAsGlyph(fn)
 		if err != nil {
@@ -148,9 +150,9 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 	if family == "" {
 		family = filepath.Base(target_fn)
 		family = family[:len(family)-len(filepath.Ext(family))]
-		if prj.Verbose {
-			fmt.Printf("assigning family name: %s\n", family)
-		}
+	}
+	if prj.Verbose {
+		fmt.Printf("- family: %s\n", family)
 	}
 	out := bytes.Buffer{}
 	err = composeGlyphsIntoSVGFont(&out, glyphs, ascent, descent, family)
@@ -158,7 +160,7 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 		return err
 	}
 
-	fmt.Printf("writing %s ... ", target_fn)
+	fmt.Printf("- writing %s ... ", target_fn)
 	err = os.WriteFile(target_fn, out.Bytes(), 0666)
 	if err == nil {
 		fmt.Printf("SUCCEEDED\n")
@@ -317,7 +319,7 @@ func RunGlyphNamesTask(prj *Project, fields map[string]any) error {
 			}
 
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
@@ -329,7 +331,7 @@ func RunGlyphNamesTask(prj *Project, fields map[string]any) error {
 	}
 
 	if prj.Verbose {
-		fmt.Printf("reading %q\n", source_fn)
+		fmt.Printf("- reading: %s\n", source_fn)
 	}
 
 	glyphs, err := extractNamedCodepoints(source_fn)
@@ -346,7 +348,7 @@ func RunGlyphNamesTask(prj *Project, fields map[string]any) error {
 		}
 		out.Flush()
 
-		fmt.Printf("writing %s ... ", t.File)
+		fmt.Printf("- writing %s ... ", t.File)
 		err = os.WriteFile(t.File, buf.Bytes(), 0666)
 		if err == nil {
 			fmt.Printf("SUCCEEDED\n")
@@ -482,7 +484,7 @@ func RunTTFTask(prj *Project, fields map[string]any) error {
 				return fmt.Errorf("%s: must be a non-empty string", k)
 			}
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
@@ -494,8 +496,8 @@ func RunTTFTask(prj *Project, fields map[string]any) error {
 	}
 
 	if prj.Verbose {
-		fmt.Printf("source %q\n", source_fn)
-		fmt.Printf("target %q\n", target_fn)
+		fmt.Printf("- source %q\n", source_fn)
+		fmt.Printf("- target %q\n", target_fn)
 	}
 
 	cmd := exec.Command("svg2ttf", "--version")

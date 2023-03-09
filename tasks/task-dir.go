@@ -53,14 +53,18 @@ func RunDirTask(prj *Project, fields map[string]any) error {
 			}
 
 		default:
-			fmt.Printf("warning: unknown field '%s'\n", k)
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
 	}
 
 	if path == "" {
 		path = filepath.Join(os.TempDir(), "btr")
 		if prj.Verbose {
-			fmt.Printf("using temporary dir '%s'", path)
+			fmt.Printf("- temporary dir: %s\n", path)
+		}
+	} else {
+		if prj.Verbose {
+			fmt.Printf("- dir: %s\n", path)
 		}
 	}
 
@@ -78,7 +82,7 @@ func RunDirTask(prj *Project, fields map[string]any) error {
 		} else {
 			// assume if_missing = create
 			if prj.Verbose {
-				fmt.Printf("creating directory '%s'", path)
+				fmt.Printf("- creating directory '%s'", path)
 			}
 			err := os.MkdirAll(path, 0755)
 			if err != nil {
@@ -109,7 +113,7 @@ func RunDirTask(prj *Project, fields map[string]any) error {
 			}
 			if len(entries) > 0 {
 				if prj.Verbose {
-					fmt.Printf("removing existing content in '%s'\n", path)
+					fmt.Printf("- removing existing content in '%s'\n", path)
 				}
 				for _, entry := range entries {
 					subpath := filepath.Join(path, entry.Name())
