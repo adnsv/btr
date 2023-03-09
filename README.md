@@ -138,7 +138,7 @@ composed of the glyphs generated from the original SVG sources.
 | target          | string, required                    | Path to the generated SVG font file, may include variables.  |
 | first-codepoint | string, optional                    | The generated font will associate glyphs with Unicode values in the [`first-codepoint`...`first-codepoint`+`<number-of-glyphs>`) range. Use `U+0000` or `0x000` syntax to specify hexadecimal value, or a plain integer for decimals. Defaults to `U+F000` when this filed is ommited. |
 | height          | integer, optional                   | Overall height of the generated font in internal font units, defaults to 512. |
-| descent         | integer, optional                   | Descent value for the glyphs in internal font units, defaults to 25% of the height. |
+| descent         | integer, optional                   | Descent value for the glyphs in internal font units, defaults to 20% of the height. |
 | family          | string, optional                    | Name of the font family; when ommited the family name will be generated from the target by removing its filename extension. |
 
 ## `ttf` task

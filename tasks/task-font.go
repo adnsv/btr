@@ -85,7 +85,7 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 	if optDescent != nil {
 		descent = *optDescent
 	} else {
-		descent = height / 4
+		descent = height * 20 / 100 // 20% by default
 	}
 
 	if prj.Verbose {
