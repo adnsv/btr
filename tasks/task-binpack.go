@@ -1,100 +1,119 @@
 package tasks
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
-	"github.com/adnsv/btr/codegen"
+	"golang.org/x/exp/maps"
 )
 
-func RunBinPackCPP(task *Task, config *Config) error {
+func RunBinpackTask(prj *Project, fields map[string]any) error {
+	sources := []string{}
+	targets := []*Target{}
 	var err error
-	targets := task.Targets
-	if len(targets) != 2 {
-		return errors.New("missing or invalid targets\nplease specify two targets \"targets\": [\"filepath.hpp\", \"filepath.cpp\"] in the task description")
-	}
-	hpath := targets[0]
-	cpath := targets[1]
-	if !filepath.IsAbs(hpath) {
-		hpath = filepath.Join(config.BaseDir, hpath)
-		hpath, err = filepath.Abs(hpath)
-		if err != nil {
-			return err
-		}
-	}
-	if !filepath.IsAbs(cpath) {
-		cpath = filepath.Join(config.BaseDir, cpath)
-		cpath, err = filepath.Abs(cpath)
-		if err != nil {
-			return err
-		}
-	}
-	hpath = filepath.Clean(hpath)
-	cpath = filepath.Clean(cpath)
-
-	sources := task.GetSources()
-	if len(sources) == 0 {
-		return errors.New("missing source paths\nspecify \"source\": \"path\" or \"sources\": [\"path\",...] in the task description")
-	}
-	filepaths, err := AbsExistingPaths(config.BaseDir, sources)
-	if err != nil {
-		return err
-	}
-
-	namespace := task.Codegen.Namespace
-
-	hpp := codegen.NewBuffer(hpath, config.Codegen)
-	cpp := codegen.NewBuffer(cpath, config.Codegen)
-	hpp.WriteLines(config.Codegen.TopMatter.Lines("hpp")...)
-	hpp.WriteLines(task.Codegen.TopMatter.Lines("hpp")...)
-	cpp.WriteLines(config.Codegen.TopMatter.Lines("cpp")...)
-	cpp.WriteLines(task.Codegen.TopMatter.Lines("cpp")...)
-
-	hpp.BeginCppNamespace(namespace)
-	cpp.BeginCppNamespace(namespace)
-
-	for _, path := range filepaths {
-		if config.Verbose {
-			fmt.Printf("loading %q\n", path)
-		}
-		name := filepath.Base(path)
-		name = name[:len(name)-len(filepath.Ext(path))]
-		name = strings.ReplaceAll(name, "-", "_")
-
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		hpp.Printf("extern const std::array<unsigned char, %d> %s;\n",
-			len(data), name)
-
-		cpp.Printf("const std::array<unsigned char, %d> %s = {",
-			len(data), name)
-		s := ""
-		for i, b := range data {
-			if i%32 == 0 {
-				s += "\n\t"
+	for k, v := range fields {
+		switch k {
+		case "source":
+			sources, err = prj.GetStrings(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
 			}
-			s += fmt.Sprintf("0x%.2x,", b)
+
+		case "target":
+			targets, err = prj.GetTargets(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			if len(targets) == 0 {
+				return fmt.Errorf("%s: must not be empty", k)
+			}
 		}
-		cpp.Print(s[:len(s)-1])
-		cpp.Print("};\n")
 	}
 
-	hpp.EndCppNamespace(namespace)
-	hpp.WriteLines(task.Codegen.BottomMatter.Lines("hpp")...)
-	hpp.WriteLines(config.Codegen.BottomMatter.Lines("hpp")...)
-	cpp.EndCppNamespace(namespace)
-	hpp.WriteLines(task.Codegen.BottomMatter.Lines("cpp")...)
-	hpp.WriteLines(config.Codegen.BottomMatter.Lines("cpp")...)
+	if len(sources) == 0 {
+		return fmt.Errorf("missing field: source")
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("missing field: target")
+	}
 
-	err = hpp.WriteOut()
+	source_fns, err := prj.AbsExistingPaths(sources)
 	if err != nil {
-		return err
+		return fmt.Errorf("source: %w", err)
+	} else if len(source_fns) == 0 {
+		return fmt.Errorf("no sources found")
 	}
-	return cpp.WriteOut()
+
+	type blobInfo struct {
+		filename  string
+		ident_cpp string
+		data      []byte
+		bytestr   string
+	}
+
+	blobs := []*blobInfo{}
+	for _, source_fn := range source_fns {
+		if prj.Verbose {
+			fmt.Printf("- reading: %s\n", source_fn)
+		}
+		data, err := os.ReadFile(source_fn)
+		if err != nil {
+			return err
+		}
+
+		filename := filepath.Base(source_fn)
+		ident_cpp := strings.ToLower(MakeCPPIdentStr(strings.ToLower(filename)))
+
+		bytestr := "    "
+		for i, b := range data {
+			if i > 0 && i%32 == 0 {
+				bytestr += "\n    "
+			}
+			bytestr += fmt.Sprintf("0x%.2x,", b)
+		}
+		blobs = append(blobs, &blobInfo{filename: filename, ident_cpp: ident_cpp, data: data, bytestr: bytestr})
+	}
+
+	for _, target := range targets {
+		entries := []string{}
+
+		for _, blob := range blobs {
+			entry_vars := maps.Clone(prj.Vars)
+			entry_vars["byte-count"] = fmt.Sprintf("%d", len(blob.data))
+			entry_vars["byte-content"] = blob.bytestr
+			entry_vars["filename"] = blob.filename
+			entry_vars["ident-cpp"] = blob.ident_cpp
+			entry, err := ExpandVariables(target.Entry, entry_vars)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, entry)
+		}
+
+		file_vars := maps.Clone(prj.Vars)
+		file_vars["entries"] = strings.Join(entries, "\n\n")
+		content, err := ExpandVariables(target.Content, file_vars)
+		if err != nil {
+			return err
+		}
+
+		buf := bytes.Buffer{}
+		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+		fmt.Fprint(out, content)
+		out.Flush()
+
+		fmt.Printf("- writing %s ... ", target.File)
+		err = os.WriteFile(target.File, buf.Bytes(), 0666)
+		if err == nil {
+			fmt.Printf("SUCCEEDED\n")
+		} else {
+			fmt.Printf("FAILED\n")
+		}
+	}
+
+	return nil
 }
