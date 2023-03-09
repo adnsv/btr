@@ -119,7 +119,7 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 
 	for _, fn := range source_fns {
 		gname := RemoveExtension(filepath.Base(fn))
-		gname = MakeIdentStr(gname)
+		gname = strings.ReplaceAll(gname, " ", "-")
 
 		if prj.Verbose {
 			n := maxPathLength - len(fn) + 1
@@ -245,10 +245,10 @@ func readSVGFileAsGlyph(fn string) (*Glyph, error) {
 }
 
 func composeGlyphsIntoSVGFont(out io.Writer, glyphs []*Glyph,
-	fontAscent, fontDescent int, fontName string) error {
+	ascent, descent int, family string) error {
 
-	fontHeight := fontAscent + fontDescent
-	horizAdvX := fontHeight
+	height := ascent + descent
+	horizAdvX := height
 
 	fmt.Fprintf(out, `<svg xmlns='http://www.w3.org/2000/svg'>
 <defs>
@@ -261,9 +261,9 @@ func composeGlyphsIntoSVGFont(out io.Writer, glyphs []*Glyph,
 		ascent="%d"
 		descent="%d" />
 	<missing-glyph horiz-adv-x="%d" />`,
-		fontName, horizAdvX,
-		fontName,
-		fontHeight, fontAscent, fontDescent, horizAdvX)
+		family, horizAdvX,
+		family,
+		height, ascent, descent, horizAdvX)
 
 	for _, g := range glyphs {
 		pd, err := svg.ParsePath(g.Path)
@@ -271,10 +271,10 @@ func composeGlyphsIntoSVGFont(out io.Writer, glyphs []*Glyph,
 			return err
 		}
 
-		scale := float64(fontHeight) / g.Height
+		scale := float64(height) / g.Height
 		for i := range pd.Vertices {
 			pd.Vertices[i].X = math.Round(pd.Vertices[i].X * scale)
-			pd.Vertices[i].Y = math.Round((g.Height-pd.Vertices[i].Y)*scale - float64(fontDescent))
+			pd.Vertices[i].Y = math.Round((g.Height-pd.Vertices[i].Y)*scale - float64(descent))
 		}
 		adv := int(math.Round(g.Width * scale))
 
