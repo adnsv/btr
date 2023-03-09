@@ -95,6 +95,10 @@ func main() {
 		fmt.Printf("running loaded tasks\n")
 	}
 	prj.Verbose = verbose
+	err = prj.ValidateVersion(app_version())
+	if err != nil {
+		log.Fatal(err)
+	}
 	err = prj.Run()
 	if err != nil {
 		log.Fatal(err)
@@ -102,3 +106,4 @@ func main() {
 
 	fmt.Print("\nmission accomplished\n")
 }
+g

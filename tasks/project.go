@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/blang/semver/v4"
 	"github.com/bmatcuk/doublestar/v4"
 	"gopkg.in/yaml.v3"
 )
@@ -52,6 +53,38 @@ func LoadProject(fn string) (*Project, error) {
 		return nil, fmt.Errorf("config error: %w", err)
 	}
 	return prj, nil
+}
+
+func (prj *Project) ValidateVersion(appver string) error {
+	if appver == "(devel)" || appver == "#UNAVAILABLE" {
+		if prj.Verbose {
+			fmt.Printf("skipping version check: running devel build")
+		}
+		return nil
+	}
+
+	if prj.Version == "" {
+		fmt.Printf("WARNING: skipping version check: missing version field in the project file")
+		return nil
+	}
+	projsemver, err := semver.ParseTolerant(prj.Version)
+	if err != nil {
+		return fmt.Errorf("version synax in '%s': %w", prj.Version, err)
+	}
+
+	appsemver, err := semver.ParseTolerant(appver)
+	if err != nil {
+		return fmt.Errorf("version check: failed to parse app version '%s'", appver)
+	}
+
+	if projsemver.Compare(appsemver) > 0 {
+		fmt.Printf("btd version >= %s is required to execute these tasks\n", projsemver)
+		fmt.Printf("you are using version %s\n", appsemver)
+		fmt.Printf("please update btd, see https://github.com/adnsv/btd for details\n")
+		return fmt.Errorf("version check: unsupported version")
+	}
+
+	return nil
 }
 
 func (prj *Project) Run() error {
