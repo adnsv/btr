@@ -106,4 +106,3 @@ func main() {
 
 	fmt.Print("\nmission accomplished\n")
 }
-g
