@@ -194,7 +194,18 @@ func readSVGFileAsGlyph(fn string) (*Glyph, error) {
 
 	vb, err := sg.ViewBox.Parse()
 	if err != nil {
-		return nil, fmt.Errorf("bad svg.viewBox attribute: %s", err)
+		w, u1, e1 := sg.Width.AsNumeric()
+		h, u2, e2 := sg.Height.AsNumeric()
+		if e1 == nil && e2 == nil &&
+			(u1 == svg.UnitNone || u1 == svg.UnitPX) &&
+			(u2 == svg.UnitNone || u2 == svg.UnitPX) {
+			vb = &svg.ViewBoxValue{
+				Width:  w,
+				Height: h,
+			}
+		} else {
+			return nil, fmt.Errorf("bad svg.viewBox attribute: %s", err)
+		}
 	}
 	var u svg.Units
 	w := vb.Width
