@@ -209,15 +209,15 @@ func codegenGLFWIcon(w io.Writer, pixmaps []*pixmapEntry, ident string) error {
 			}
 			s += fmt.Sprintf("0x%.2x,", b)
 		}
-		fmt.Fprintf(w, "unsigned char const %s[%d] const = {\n", pixmap.ident, len(bb))
+		fmt.Fprintf(w, "unsigned char const %s[%d] = {\n", pixmap.ident, len(bb))
 		fmt.Fprintln(w, s)
 		fmt.Fprintf(w, "};\n\n")
 	}
 
 	fmt.Fprintf(w, "int const %s_count = %d;\n\n", ident, len(pixmaps))
-	fmt.Fprintf(w, "GLFWimage const %s[%d] = {\n", ident, len(pixmaps))
+	fmt.Fprintf(w, "extern GLFWimage const %s[%d] = {\n", ident, len(pixmaps))
 	for _, pixmap := range pixmaps {
-		fmt.Fprintf(w, "    {%d, %d, %s},\n", pixmap.size.X, pixmap.size.Y, pixmap.ident)
+		fmt.Fprintf(w, "    {%d, %d, const_cast<unsigned char*>(%s)},\n", pixmap.size.X, pixmap.size.Y, pixmap.ident)
 	}
 	fmt.Fprintf(w, "};\n")
 
