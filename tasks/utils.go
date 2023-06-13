@@ -164,4 +164,6 @@ var cppReservedKeywords = [...]string{
 	"_Imaginary",
 	"_Noreturn",
 	"_Static_assert",
-	"_Thread_local"}
+	"_Thread_local",
+	"import",
+	"export"}
