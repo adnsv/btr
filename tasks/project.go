@@ -78,9 +78,9 @@ func (prj *Project) ValidateVersion(appver string) error {
 	}
 
 	if projsemver.Compare(appsemver) > 0 {
-		fmt.Printf("btd version >= %s is required to execute these tasks\n", projsemver)
+		fmt.Printf("btr version >= %s is required to execute these tasks\n", projsemver)
 		fmt.Printf("you are using version %s\n", appsemver)
-		fmt.Printf("please update btd, see https://github.com/adnsv/btd for details\n")
+		fmt.Printf("please update btr, see https://github.com/adnsv/btr for details\n")
 		return fmt.Errorf("version check: unsupported version")
 	}
 
