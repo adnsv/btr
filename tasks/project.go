@@ -132,8 +132,8 @@ func (prj *Project) RunTask(t *Task) error {
 		err = RunTTFTask(prj, t.Fields)
 	case "glyph-names":
 		err = RunGlyphNamesTask(prj, t.Fields)
-	case "glfw-icon":
-		err = RunGLFWIconTask(prj, t.Fields)
+	case "embed-icon":
+		err = RunEmbedIconTask(prj, t.Fields)
 	case "win32-icon":
 		err = RunWin32IconTask(prj, t.Fields)
 

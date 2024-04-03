@@ -193,16 +193,15 @@ following additional variables are available for expansion:
 - `${utf8-escaped-cpp}` a Unicode glyph value represented as a sequence of C++
   escaped code units.
 
-## `glfw-icon` task
+## `embed-icon` task
 
-Code-generates a C++ file that can be used for embedding multi-resolution GLFW
+Code-generates a C++ file that can be used for embedding multi-resolution (GLFW) and single-resolution (SDL2/SDL3)
 icon into your application from a set of PNG/JPEG files.
 
 | field  | value | description |
 | ------ | ----- | ----------- |
 | source | string or a list of strings, required | Paths to PNG/JPEG files, may include wildcards, double-star `**` for traversing subdirs recursively, and variables. |
 | target | string, required                      | Path to the generated C++ file, may include variables.       |
-| ident  | string, optional                      | A C++ identifier name for the generated constant.            |
 
 ## `win32-icon` task
 

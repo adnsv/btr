@@ -116,10 +116,9 @@ func loadPixmaps(source_fns []string) ([]*pixmapEntry, error) {
 	return pixmaps, nil
 }
 
-func RunGLFWIconTask(prj *Project, fields map[string]any) error {
+func RunEmbedIconTask(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	target_fn := ""
-	ident := "glfw_icon"
 
 	var err error
 
@@ -140,17 +139,6 @@ func RunGLFWIconTask(prj *Project, fields map[string]any) error {
 			} else {
 				return fmt.Errorf("%s: must be a non-empty string", k)
 			}
-
-		case "ident":
-			if s, ok := v.(string); !ok || s == "" {
-				return fmt.Errorf("%s: must be a non-empty string", k)
-			} else {
-				ident, err = ExpandVariables(s, prj.Vars)
-				if err != nil {
-					return fmt.Errorf("%s: %w", k, err)
-				}
-			}
-
 		default:
 			fmt.Printf("- WARNING: unknown field '%s'\n", k)
 		}
@@ -177,7 +165,7 @@ func RunGLFWIconTask(prj *Project, fields map[string]any) error {
 
 	buf := bytes.Buffer{}
 	out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
-	err = codegenGLFWIcon(out, pixmaps, ident)
+	err = codegenGLFWIcon(out, pixmaps)
 	if err != nil {
 		return err
 	}
@@ -192,14 +180,33 @@ func RunGLFWIconTask(prj *Project, fields map[string]any) error {
 	return nil
 }
 
-func codegenGLFWIcon(w io.Writer, pixmaps []*pixmapEntry, ident string) error {
+func codegenGLFWIcon(w io.Writer, pixmaps []*pixmapEntry) error {
 
-	fmt.Fprintf(w, "#include <GLFW/glfw3.h>\n\n")
+	fmt.Fprintf(w, `// generated file, do not edit
+#if defined(APPICON_GLFW)
+#include <GLFW/glfw3.h>
+#elif defined(APPICON_SDL2)
+#include <SDL.h>
+#elif defined(APPICON_SDL3)
+#include <SDL3/SDL.h>
+#endif
+
+`)
+
+	if len(pixmaps) == 0 {
+		return nil
+	}
+
+	largestPixmap := pixmaps[0]
 
 	for _, pixmap := range pixmaps {
 		bb, err := pixmap.convert("nrgba")
 		if err != nil {
 			return err
+		}
+
+		if largestPixmap == nil || pixmap.size.Y > largestPixmap.size.Y {
+			largestPixmap = pixmap
 		}
 
 		s := "   "
@@ -214,11 +221,42 @@ func codegenGLFWIcon(w io.Writer, pixmaps []*pixmapEntry, ident string) error {
 		fmt.Fprintf(w, "};\n\n")
 	}
 
-	fmt.Fprintf(w, "int const %s_count = %d;\n\n", ident, len(pixmaps))
-	fmt.Fprintf(w, "extern GLFWimage const %s[%d] = {\n", ident, len(pixmaps))
-	for _, pixmap := range pixmaps {
-		fmt.Fprintf(w, "    {%d, %d, const_cast<unsigned char*>(%s)},\n", pixmap.size.X, pixmap.size.Y, pixmap.ident)
+	fmt.Fprint(w, "extern void setup_app_icon(void* native_window_handle)\n{\n")
+
+	{
+		fmt.Fprint(w, "#if defined(APPICON_GLFW)\n")
+		fmt.Fprintf(w, "    static GLFWimage const images[%d] = {\n", len(pixmaps))
+		for _, pixmap := range pixmaps {
+			fmt.Fprintf(w, "        {%d, %d, const_cast<unsigned char*>(%s)},\n", pixmap.size.X, pixmap.size.Y, pixmap.ident)
+		}
+		fmt.Fprintf(w, "    };\n")
+		fmt.Fprintf(w, "    glfwSetWindowIcon(static_cast<GLFWwindow*>(native_window_handle), %d, images);\n\n", len(pixmaps))
 	}
+
+	{
+		fmt.Fprintf(w, `#elif defined(APPICON_SDL2)
+    auto surface = SDL_CreateRGBSurfaceWithFormatFrom(
+        const_cast<void*>(reinterpret_cast<void const*>(%s)),
+        %d, %d, 32, %d * 4, SDL_PIXELFORMAT_ABGR8888);
+    SDL_SetWindowIcon(static_cast<SDL_Window*>(native_window_handle), surface);
+    SDL_FreeSurface(surface);
+
+`, largestPixmap.ident, largestPixmap.size.X, largestPixmap.size.Y, largestPixmap.size.X)
+	}
+
+	{
+		fmt.Fprintf(w, `#elif defined(APPICON_SDL3)
+    auto surface = SDL_CreateSurfaceFrom(
+        const_cast<void*>(reinterpret_cast<void const*>(%s)),
+        %d, %d, %d * 4, SDL_PIXELFORMAT_ABGR8888);
+    SDL_SetWindowIcon(static_cast<SDL_Window*>(native_window_handle), surface);
+    SDL_DestroySurface(surface);
+
+`, largestPixmap.ident, largestPixmap.size.X, largestPixmap.size.Y, largestPixmap.size.X)
+	}
+
+	fmt.Fprint(w, "#endif\n")
+
 	fmt.Fprintf(w, "};\n")
 
 	return nil
