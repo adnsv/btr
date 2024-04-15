@@ -20,6 +20,11 @@ tasks:
     if-missing: create
     var: tmp-dir
 
+  - name: Convert SVG graphics
+    type: svg-convert
+    source: picture.svg
+    target: picture.cpp
+
   - name: Make SVG font
     type: svgfont
     source: ${app-font-src}
@@ -79,16 +84,16 @@ tasks:
 
           } // namespace resource
 
-  - name: Prepare GLFW application icon resource
-    type: glfw-icon
+  - name: Codegen embeddable application icon resource
+    type: embed-icon
     source:
       - ./app-icon/*-16.png
       - ./app-icon/*-24.png
       - ./app-icon/*-32.png
       - ./app-icon/*-48.png
       - ./app-icon/*-64.png
-    target: ./${app-icon}.glfw.cpp
-    ident: glfw_icon
+    target: ./${app-icon}.embed.cpp
+    ident: embed_icon
 
   - name: Prepare WIN32 icon resource
     type: win32-icon

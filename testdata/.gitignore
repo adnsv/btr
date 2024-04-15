@@ -1,4 +1,5 @@
 app-font-glyphs.*
 app-font-resource.*
-app-icon.glfw.*
+app-icon.embed.*
 app-icon.win32.*
+picture.cpp

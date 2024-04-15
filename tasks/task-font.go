@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -378,7 +377,7 @@ type NamedCodepoint struct {
 
 func extractNamedCodepoints(source_fn string) (glyphs []*NamedCodepoint, err error) {
 	var buf []byte
-	buf, err = ioutil.ReadFile(source_fn)
+	buf, err = os.ReadFile(source_fn)
 	if err != nil {
 		return
 	}
