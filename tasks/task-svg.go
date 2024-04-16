@@ -207,8 +207,22 @@ func readGroup(vg *VG, g *svg.Group, xform *svg.Transform) error {
 			}
 
 		case *svg.Circle:
+			err := readCircle(vg, v, xform)
+			if err != nil {
+				return err
+			}
 
 		case *svg.Ellipse:
+			err := readEllipse(vg, v, xform)
+			if err != nil {
+				return err
+			}
+
+		case *svg.Polygon:
+			err := readPolygon(vg, v, xform)
+			if err != nil {
+				return err
+			}
 
 		case *svg.Path:
 			err := readPath(vg, v, xform)
@@ -264,9 +278,9 @@ func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
 
 	if rx <= 0 || ry <= 0 {
 		vg.MoveTo(xform, svg.Vertex{X: x, Y: y})
-		vg.MoveTo(xform, svg.Vertex{X: x + width, Y: y})
-		vg.MoveTo(xform, svg.Vertex{X: x + width, Y: y + height})
-		vg.MoveTo(xform, svg.Vertex{X: x, Y: y + height})
+		vg.LineTo(xform, svg.Vertex{X: x + width, Y: y})
+		vg.LineTo(xform, svg.Vertex{X: x + width, Y: y + height})
+		vg.LineTo(xform, svg.Vertex{X: x, Y: y + height})
 		vg.Close()
 	} else {
 		if rx > width*0.5 {
@@ -276,8 +290,8 @@ func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
 			ry = height * 0.5
 		}
 
-		kx := 0.5522847498 * rx
-		ky := 0.5522847498 * ry
+		kx := (1.0 - 0.551784) * rx
+		ky := (1.0 - 0.551784) * ry
 
 		vg.MoveTo(xform, svg.Vertex{X: x + rx, Y: y})
 		vg.LineTo(xform, svg.Vertex{X: x + width - rx, Y: y})
@@ -297,22 +311,121 @@ func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
 	return nil
 }
 
-func calcShapePaint(s *svg.Shape) RGBA {
-	rgba := RGBA{}
-	if s.Fill.Kind == svg.PaintKindRGB {
-		rgba.R = s.Fill.Color.R
-		rgba.G = s.Fill.Color.G
-		rgba.B = s.Fill.Color.B
+func readCircle(vg *VG, p *svg.Circle, xform *svg.Transform) error {
+	cx, err := lengthPixels(vg, p.Cx, &vg.ViewBox.Width)
+	if err != nil {
+		return err
 	}
-	rgba.A = 255
-	if s.FillOpacity != nil {
-		if *s.FillOpacity < 0.0 {
-			rgba.A = 0
-		} else if *s.FillOpacity < 1.0 {
-			rgba.A = uint8(*s.FillOpacity * 255)
+	cy, err := lengthPixels(vg, p.Cy, &vg.ViewBox.Height)
+	if err != nil {
+		return err
+	}
+	r := 1.0
+	if p.Radius != "" {
+		r, err = lengthPixels(vg, p.Radius, &vg.ViewBox.Width)
+		if err != nil {
+			return err
 		}
 	}
-	return rgba
+
+	k := 0.551784 * r
+
+	vg.MoveTo(xform, svg.Vertex{X: cx - r, Y: cy})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx - r, Y: cy - k},
+		svg.Vertex{X: cx - k, Y: cy - r},
+		svg.Vertex{X: cx, Y: cy - r})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx + k, Y: cy - r},
+		svg.Vertex{X: cx + r, Y: cy - k},
+		svg.Vertex{X: cx + r, Y: cy})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx + r, Y: cy + k},
+		svg.Vertex{X: cx + k, Y: cy + r},
+		svg.Vertex{X: cx, Y: cy + r})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx - k, Y: cy + r},
+		svg.Vertex{X: cx - r, Y: cy + k},
+		svg.Vertex{X: cx - r, Y: cy})
+	vg.Close()
+
+	vg.Fill(calcShapePaint(&p.Shape))
+	return nil
+}
+
+func readEllipse(vg *VG, p *svg.Ellipse, xform *svg.Transform) error {
+	cx, err := lengthPixels(vg, p.Cx, &vg.ViewBox.Width)
+	if err != nil {
+		return err
+	}
+	cy, err := lengthPixels(vg, p.Cy, &vg.ViewBox.Height)
+	if err != nil {
+		return err
+	}
+	rx, ry := 0.0, 0.0
+	if p.Rx != "" {
+		rx, err = lengthPixels(vg, p.Rx, &vg.ViewBox.Width)
+		if err != nil {
+			return err
+		}
+		if p.Ry == "" {
+			ry = rx
+		}
+	}
+	if p.Ry != "" {
+		ry, err = lengthPixels(vg, p.Ry, &vg.ViewBox.Height)
+		if err != nil {
+			return err
+		}
+		if p.Rx == "" {
+			rx = ry
+		}
+	}
+
+	kx := 0.551784 * rx
+	ky := 0.551784 * ry
+
+	vg.MoveTo(xform, svg.Vertex{X: cx - rx, Y: cy})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx - rx, Y: cy - ky},
+		svg.Vertex{X: cx - kx, Y: cy - ry},
+		svg.Vertex{X: cx, Y: cy - ry})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx + kx, Y: cy - ry},
+		svg.Vertex{X: cx + rx, Y: cy - ky},
+		svg.Vertex{X: cx + rx, Y: cy})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx + rx, Y: cy + ky},
+		svg.Vertex{X: cx + kx, Y: cy + ry},
+		svg.Vertex{X: cx, Y: cy + ry})
+	vg.CurveTo(xform,
+		svg.Vertex{X: cx - kx, Y: cy + ry},
+		svg.Vertex{X: cx - rx, Y: cy + ky},
+		svg.Vertex{X: cx - rx, Y: cy})
+	vg.Close()
+
+	vg.Fill(calcShapePaint(&p.Shape))
+	return nil
+}
+
+func readPolygon(vg *VG, p *svg.Polygon, xform *svg.Transform) error {
+	pp, err := svg.ParsePoints(p.Points)
+	if err != nil {
+		return err
+	}
+
+	if len(pp) < 2 {
+		return nil
+	}
+
+	vg.MoveTo(xform, pp[0])
+	for _, p := range pp[1:] {
+		vg.LineTo(xform, p)
+	}
+	vg.Close()
+	vg.Fill(calcShapePaint(&p.Shape))
+
+	return nil
 }
 
 func readPath(vg *VG, p *svg.Path, xform *svg.Transform) error {
@@ -400,9 +513,27 @@ func writeVG(out io.Writer, src *VG) {
 		} else if i > 0 {
 			s += " "
 		}
-		s += fmt.Sprintf("0x%.2x%.2x%.2x%.2x,", v.A, v.R, v.G, v.B)
+		s += fmt.Sprintf("0x%.2x%.2x%.2x%.2x,", v.A, v.B, v.G, v.R)
 	}
 	fmt.Fprint(out, s)
 	fmt.Fprintf(out, "\n}};\n\n")
 
+}
+
+func calcShapePaint(s *svg.Shape) RGBA {
+	rgba := RGBA{}
+	if s.Fill.Kind == svg.PaintKindRGB {
+		rgba.R = s.Fill.Color.R
+		rgba.G = s.Fill.Color.G
+		rgba.B = s.Fill.Color.B
+	}
+	rgba.A = 255
+	if s.FillOpacity != nil {
+		if *s.FillOpacity < 0.0 {
+			rgba.A = 0
+		} else if *s.FillOpacity < 1.0 {
+			rgba.A = uint8(*s.FillOpacity * 255)
+		}
+	}
+	return rgba
 }
