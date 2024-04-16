@@ -167,3 +167,50 @@ var cppReservedKeywords = [...]string{
 	"_Thread_local",
 	"import",
 	"export"}
+
+func CommaWrap(segments []string, indent string, limit int) string {
+	ret := ""
+
+	ln := ""
+	for _, s := range segments {
+		if len(ln) == 0 {
+			ln = s + ","
+		} else if len(ln)+2+len(s) <= limit {
+			ln += " " + s + ","
+		} else {
+			if len(ret) > 0 {
+				ret += "\n"
+			}
+			ret += indent + ln
+			ln = s + ","
+		}
+	}
+	if len(ln) > 0 {
+		if len(ret) > 0 {
+			ret += "\n"
+		}
+		ret += indent + ln
+	}
+	return ret
+}
+
+func StringQWrap(s string, indent string, limit int) string {
+	if limit > 2 {
+		limit -= 2
+	}
+	ret := ""
+	for len(s) > limit {
+		if len(ret) > 0 {
+			ret += "\n"
+		}
+		ret += indent + fmt.Sprintf("%q", s[:limit])
+		s = s[limit:]
+	}
+	if len(s) > 0 {
+		if len(ret) > 0 {
+			ret += "\n"
+		}
+		ret += indent + fmt.Sprintf("%q", s)
+	}
+	return ret
+}
