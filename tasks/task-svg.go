@@ -594,7 +594,7 @@ func packVG(src *VG) []byte {
 	}
 
 	// eof
-	buf = binary.LittleEndian.AppendUint32(buf, block_tag|0)
+	buf = binary.LittleEndian.AppendUint32(buf, block_tag)
 
 	return buf
 }
