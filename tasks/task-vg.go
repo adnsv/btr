@@ -14,10 +14,11 @@ import (
 	"github.com/adnsv/svg"
 )
 
-func RunSVGConvertTask(prj *Project, fields map[string]any) error {
+func RunVGConvertTask(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	hpp_fn := ""
 	cpp_fn := ""
+	namespace := ""
 
 	var err error
 
@@ -46,6 +47,13 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 				if err != nil {
 					return fmt.Errorf("%s: %w", k, err)
 				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+
+		case "namespace":
+			if s, ok := v.(string); ok && s != "" {
+				namespace = s
 			} else {
 				return fmt.Errorf("%s: must be a non-empty string", k)
 			}
@@ -90,11 +98,20 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 
 	fmt.Fprintf(hpp_out, "#pragma once\n\n")
 	fmt.Fprintf(hpp_out, "#include <array>\n\n")
-
 	fmt.Fprintf(cpp_out, "#include %q\n\n", rel_name)
+
+	if namespace != "" {
+		fmt.Fprintf(hpp_out, "namespace %s {\n\n", namespace)
+		fmt.Fprintf(cpp_out, "namespace %s {\n\n", namespace)
+	}
 
 	for _, vg := range inputs {
 		writeVG(hpp_out, cpp_out, vg)
+	}
+
+	if namespace != "" {
+		fmt.Fprintf(hpp_out, "} // namespace %s\n", namespace)
+		fmt.Fprintf(cpp_out, "} // namespace %s\n", namespace)
 	}
 
 	hpp_out.Flush()
@@ -127,6 +144,7 @@ type VG struct {
 	ColorIndices []int
 	ColorValues  []RGBA
 	Opacities    []float64
+	Ids          []string
 }
 
 type RGBA struct {
@@ -173,11 +191,18 @@ func (vg *VG) Fill(rgba RGBA) {
 	vg.Commands += "f"
 	vg.ColorIndices = append(vg.ColorIndices, vg.addColor(rgba))
 }
-func (vg *VG) StartGroup(opacity float64) {
-	vg.Commands += "["
+func (vg *VG) StartLayer(opacity float64) {
+	vg.Commands += "{"
 	vg.Opacities = append(vg.Opacities, opacity)
 }
-func (vg *VG) StopGroup() {
+func (vg *VG) StopLayer() {
+	vg.Commands += "}"
+}
+func (vg *VG) PushID(id string) {
+	vg.Commands += "["
+	vg.Ids = append(vg.Ids, id)
+}
+func (vg *VG) PopID() {
 	vg.Commands += "]"
 }
 
@@ -236,15 +261,18 @@ func lengthPixels(vg *VG, l svg.Length, reflength *float64) (float64, error) {
 }
 
 func readGroup(vg *VG, g *svg.Group, xform *svg.Transform) error {
+	if id := g.ID(); id != "" {
+		vg.PushID(id)
+		defer vg.PopID()
+	}
 
 	if g.Transform != nil {
 		xform = svg.Concatenate(xform, g.Transform)
 	}
 
-	needsGroup := g.Opacity != nil && *g.Opacity < 1.0
-
-	if needsGroup {
-		vg.StartGroup(*g.Opacity)
+	needsLayer := g.Opacity != nil && *g.Opacity < 1.0
+	if needsLayer {
+		vg.StartLayer(*g.Opacity)
 	}
 
 	for _, it := range g.Items {
@@ -292,14 +320,19 @@ func readGroup(vg *VG, g *svg.Group, xform *svg.Transform) error {
 		}
 	}
 
-	if needsGroup {
-		vg.StopGroup()
+	if needsLayer {
+		vg.StopLayer()
 	}
 
 	return nil
 }
 
 func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
+	if id := p.ID(); id != "" {
+		vg.PushID(id)
+		defer vg.PopID()
+	}
+
 	x, err := lengthPixels(vg, p.X, &vg.ViewBox.Width)
 	if err != nil {
 		return err
@@ -373,6 +406,11 @@ func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
 }
 
 func readCircle(vg *VG, p *svg.Circle, xform *svg.Transform) error {
+	if id := p.ID(); id != "" {
+		vg.PushID(id)
+		defer vg.PopID()
+	}
+
 	cx, err := lengthPixels(vg, p.Cx, &vg.ViewBox.Width)
 	if err != nil {
 		return err
@@ -415,6 +453,11 @@ func readCircle(vg *VG, p *svg.Circle, xform *svg.Transform) error {
 }
 
 func readEllipse(vg *VG, p *svg.Ellipse, xform *svg.Transform) error {
+	if id := p.ID(); id != "" {
+		vg.PushID(id)
+		defer vg.PopID()
+	}
+
 	cx, err := lengthPixels(vg, p.Cx, &vg.ViewBox.Width)
 	if err != nil {
 		return err
@@ -479,6 +522,11 @@ func readPolygon(vg *VG, p *svg.Polygon, xform *svg.Transform) error {
 		return nil
 	}
 
+	if id := p.ID(); id != "" {
+		vg.PushID(id)
+		defer vg.PopID()
+	}
+
 	vg.MoveTo(xform, pp[0])
 	for _, p := range pp[1:] {
 		vg.LineTo(xform, p)
@@ -490,9 +538,15 @@ func readPolygon(vg *VG, p *svg.Polygon, xform *svg.Transform) error {
 }
 
 func readPath(vg *VG, p *svg.Path, xform *svg.Transform) error {
+
 	pp, err := svg.ParsePath(p.D)
 	if err != nil {
 		return err
+	}
+
+	if id := p.ID(); id != "" {
+		vg.PushID(id)
+		defer vg.PopID()
 	}
 
 	vv := pp.Vertices
@@ -577,7 +631,7 @@ func packVG(src *VG) []byte {
 	if len(src.ColorValues) > 0 {
 		start(4, len(src.ColorValues))
 		for _, v := range src.ColorValues {
-			buf = append(buf, v.A, v.B, v.G, v.R)
+			buf = append(buf, v.R, v.G, v.B, v.A)
 		}
 	}
 
@@ -591,6 +645,19 @@ func packVG(src *VG) []byte {
 			}
 			buf = append(buf, uint8(v*255))
 		}
+	}
+
+	if len(src.Ids) > 0 {
+		start(6, len(src.Ids))
+		s := ""
+		cur := 0
+		for _, v := range src.Ids {
+			cur += len(v)
+			s += v
+			buf = binary.LittleEndian.AppendUint16(buf, uint16(cur))
+		}
+		start(7, len(s))
+		buf = append(buf, []byte(s)...)
 	}
 
 	// eof

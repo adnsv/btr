@@ -136,8 +136,8 @@ func (prj *Project) RunTask(t *Task) error {
 		err = RunEmbedIconTask(prj, t.Fields)
 	case "win32-icon":
 		err = RunWin32IconTask(prj, t.Fields)
-	case "svg-convert":
-		err = RunSVGConvertTask(prj, t.Fields)
+	case "vg-convert":
+		err = RunVGConvertTask(prj, t.Fields)
 
 	default:
 		log.Printf("unsupported type '%s'", t.Type)
