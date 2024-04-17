@@ -16,7 +16,8 @@ import (
 
 func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 	sources := []string{}
-	target_fn := ""
+	hpp_fn := ""
+	cpp_fn := ""
 
 	var err error
 
@@ -29,9 +30,9 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 				return fmt.Errorf("%s: %w", k, err)
 			}
 
-		case "target":
+		case "hpp-target":
 			if s, ok := v.(string); ok && s != "" {
-				target_fn, err = prj.AbsPath(s)
+				hpp_fn, err = prj.AbsPath(s)
 				if err != nil {
 					return fmt.Errorf("%s: %w", k, err)
 				}
@@ -39,11 +40,24 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 				return fmt.Errorf("%s: must be a non-empty string", k)
 			}
 
+		case "cpp-target":
+			if s, ok := v.(string); ok && s != "" {
+				cpp_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
 		}
 	}
 
-	if target_fn == "" {
-		return fmt.Errorf("missing field: target")
+	if hpp_fn == "" {
+		return fmt.Errorf("missing field: hpp-target")
+	}
+
+	if cpp_fn == "" {
+		return fmt.Errorf("missing field: cpp-target")
 	}
 
 	if len(sources) == 0 {
@@ -57,8 +71,13 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 		return fmt.Errorf("no sources found")
 	}
 
-	inputs := []*VG{}
+	hpp_buf := bytes.Buffer{}
+	hpp_out := tabwriter.NewWriter(&hpp_buf, 0, 4, 4, ' ', 0)
 
+	cpp_buf := bytes.Buffer{}
+	cpp_out := tabwriter.NewWriter(&cpp_buf, 0, 4, 4, ' ', 0)
+
+	inputs := []*VG{}
 	for _, fn := range source_fns {
 		vg, err := readSVGFile(fn)
 		if err != nil {
@@ -67,18 +86,30 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 		inputs = append(inputs, vg)
 	}
 
-	buf := bytes.Buffer{}
-	out := tabwriter.NewWriter(&buf, 0, 4, 4, ' ', 0)
+	rel_name, _ := filepath.Rel(filepath.Dir(cpp_fn), hpp_fn)
 
-	fmt.Fprintf(out, "// vector paths\n")
+	fmt.Fprintf(hpp_out, "#pragma once\n\n")
+	fmt.Fprintf(hpp_out, "#include <array>\n\n")
+
+	fmt.Fprintf(cpp_out, "#include %q\n\n", rel_name)
 
 	for _, vg := range inputs {
-		writeVG(out, vg)
+		writeVG(hpp_out, cpp_out, vg)
 	}
 
-	fmt.Printf("- writing %s ... ", target_fn)
-	out.Flush()
-	err = os.WriteFile(target_fn, buf.Bytes(), 0666)
+	hpp_out.Flush()
+	cpp_out.Flush()
+
+	fmt.Printf("- writing %s ... ", hpp_fn)
+	err = os.WriteFile(hpp_fn, hpp_buf.Bytes(), 0666)
+	if err == nil {
+		fmt.Printf("SUCCEEDED\n")
+	} else {
+		fmt.Printf("FAILED\n")
+	}
+
+	fmt.Printf("- writing %s ... ", cpp_fn)
+	err = os.WriteFile(cpp_fn, cpp_buf.Bytes(), 0666)
 	if err == nil {
 		fmt.Printf("SUCCEEDED\n")
 	} else {
@@ -89,12 +120,13 @@ func RunSVGConvertTask(prj *Project, fields map[string]any) error {
 }
 
 type VG struct {
-	Filename  string
-	ViewBox   svg.ViewBoxValue
-	Commands  string
-	Vertices  []svg.Vector
-	Fills     []RGBA
-	Opacities []float64
+	Filename     string
+	ViewBox      svg.ViewBoxValue
+	Commands     string
+	Vertices     []svg.Vector
+	ColorIndices []int
+	ColorValues  []RGBA
+	Opacities    []float64
 }
 
 type RGBA struct {
@@ -107,6 +139,16 @@ type RGBA struct {
 func addVertex(vg *VG, xform *svg.Transform, v svg.Vertex) {
 	x, y := xform.CalcAbs(v.X, v.Y)
 	vg.Vertices = append(vg.Vertices, svg.Vertex{X: x, Y: y})
+}
+
+func (vg *VG) addColor(c RGBA) int {
+	for i, v := range vg.ColorValues {
+		if v == c {
+			return i
+		}
+	}
+	vg.ColorValues = append(vg.ColorValues, c)
+	return len(vg.ColorValues) - 1
 }
 
 func (vg *VG) Close() {
@@ -129,7 +171,7 @@ func (vg *VG) CurveTo(xform *svg.Transform, c1, c2, v svg.Vertex) {
 }
 func (vg *VG) Fill(rgba RGBA) {
 	vg.Commands += "f"
-	vg.Fills = append(vg.Fills, rgba)
+	vg.ColorIndices = append(vg.ColorIndices, vg.addColor(rgba))
 }
 func (vg *VG) StartGroup(opacity float64) {
 	vg.Commands += "["
@@ -499,10 +541,10 @@ func packVG(src *VG) []byte {
 
 	buf := []byte{}
 	magic_ver := uint32(0xfff00001)
-	block_start := uint32(0xffee0000)
+	block_tag := uint32(0xffee0000)
 
 	start := func(block_id uint32, counter int) {
-		buf = binary.LittleEndian.AppendUint32(buf, block_start|block_id)
+		buf = binary.LittleEndian.AppendUint32(buf, block_tag|block_id)
 		buf = binary.LittleEndian.AppendUint32(buf, uint32(counter))
 	}
 
@@ -510,41 +552,55 @@ func packVG(src *VG) []byte {
 	buf = binary.LittleEndian.AppendUint16(buf, width_16)
 	buf = binary.LittleEndian.AppendUint16(buf, height_16)
 
-	start(1, len(src.Commands))
-	buf = append(buf, []byte(src.Commands)...)
-
-	start(2, len(src.Vertices))
-	for _, v := range src.Vertices {
-		x := uint16((v.X - src.ViewBox.MinX) * vertex_scale)
-		y := uint16((v.Y - src.ViewBox.MinY) * vertex_scale)
-		buf = binary.LittleEndian.AppendUint16(buf, x)
-		buf = binary.LittleEndian.AppendUint16(buf, y)
+	if len(src.Commands) > 0 {
+		start(1, len(src.Commands))
+		buf = append(buf, []byte(src.Commands)...)
 	}
 
-	start(3, len(src.Fills))
-	for _, v := range src.Fills {
-		buf = append(buf, v.A, v.B, v.G, v.R)
-	}
-
-	start(4, len(src.Opacities))
-	for _, v := range src.Opacities {
-		if v < 0.0 {
-			v = 0
-		} else if v > 1.0 {
-			v = 1.0
+	if len(src.Vertices) > 0 {
+		start(2, len(src.Vertices))
+		for _, v := range src.Vertices {
+			x := int16((v.X - src.ViewBox.MinX) * vertex_scale)
+			y := int16((v.Y - src.ViewBox.MinY) * vertex_scale)
+			buf = binary.LittleEndian.AppendUint16(buf, uint16(x))
+			buf = binary.LittleEndian.AppendUint16(buf, uint16(y))
 		}
-		buf = append(buf, uint8(v*255))
 	}
+
+	if len(src.ColorIndices) > 0 {
+		start(3, len(src.ColorIndices))
+		for _, v := range src.ColorIndices {
+			buf = binary.LittleEndian.AppendUint16(buf, uint16(v))
+		}
+	}
+
+	if len(src.ColorValues) > 0 {
+		start(4, len(src.ColorValues))
+		for _, v := range src.ColorValues {
+			buf = append(buf, v.A, v.B, v.G, v.R)
+		}
+	}
+
+	if len(src.Opacities) > 0 {
+		start(5, len(src.Opacities))
+		for _, v := range src.Opacities {
+			if v < 0.0 {
+				v = 0
+			} else if v > 1.0 {
+				v = 1.0
+			}
+			buf = append(buf, uint8(v*255))
+		}
+	}
+
+	// eof
+	buf = binary.LittleEndian.AppendUint32(buf, block_tag|0)
 
 	return buf
 }
 
-func writeVG(out io.Writer, src *VG) {
+func writeVG(hpp, cpp io.Writer, src *VG) {
 	buf := packVG(src)
-
-	fmt.Fprintf(out, "// source: %s\n\n", filepath.Base(src.Filename))
-	fmt.Fprintf(out, "#include <array>\n")
-	fmt.Fprintf(out, "#include <string_view>\n\n")
 
 	ident := MakeCPPIdentStr(strings.ToLower(RemoveExtension(filepath.Base(src.Filename))))
 
@@ -553,49 +609,17 @@ func writeVG(out io.Writer, src *VG) {
 		bb = append(bb, fmt.Sprintf("0x%.2x", v))
 	}
 
-	fmt.Fprintf(out, "const std::array<uint8_t, %d> %s = {{\n%s\n}};\n\n",
+	fmt.Fprintf(hpp, "extern const std::array<unsigned char, %d> %s;\n\n",
+		len(buf), ident)
+	fmt.Fprintf(cpp, "const std::array<unsigned char, %d> %s = {\n%s\n};\n\n",
 		len(buf), ident, CommaWrap(bb, "\t", 100))
-
-	/*
-
-		fmt.Fprintf(out, "// source: %s\n\n", filepath.Base(src.Filename))
-		fmt.Fprintf(out, "#include <array>\n")
-		fmt.Fprintf(out, "#include <string_view>\n\n")
-
-
-
-		fmt.Fprintf(out, "const std::string_view %s_commands = \n%s;\n\n", ident, StringQWrap(src.Commands, "\t", 100))
-
-		scale := float64(10)
-
-		fmt.Fprintf(out, "const int %s_x = %d;\n", ident, int(src.ViewBox.MinX*scale))
-		fmt.Fprintf(out, "const int %s_y = %d;\n", ident, int(src.ViewBox.MinY*scale))
-		fmt.Fprintf(out, "const int %s_w = %d;\n", ident, int(src.ViewBox.Width*scale))
-		fmt.Fprintf(out, "const int %s_h = %d;\n", ident, int(src.ViewBox.Height*scale))
-
-		ss := []string{}
-		for _, v := range src.Vertices {
-			ss = append(ss, fmt.Sprintf("%d,%d", int(v.X*scale), int(v.Y*scale)))
-		}
-
-		fmt.Fprintf(out, "const std::array<int16_t, %d> %s_vertices = {{\n%s\n}};\n\n",
-			len(src.Vertices)*2, ident, CommaWrap(ss, "\t", 100))
-
-		ss = ss[:0]
-		for _, v := range src.Fills {
-			ss = append(ss, fmt.Sprintf("0x%.2x%.2x%.2x%.2x", v.A, v.B, v.G, v.R))
-		}
-
-		fmt.Fprintf(out, "const std::array<uint32_t, %d> %s_fills = {{\n%s\n}};\n\n",
-			len(src.Fills), ident, CommaWrap(ss, "\t", 100))
-	*/
 }
 
 func calcShapePaint(s *svg.Shape) RGBA {
 	rgba := RGBA{
-		R: 255,
-		G: 255,
-		B: 255,
+		R: 0,
+		G: 0,
+		B: 0,
 		A: 255,
 	}
 	if s.Fill != nil {
