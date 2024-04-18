@@ -22,6 +22,7 @@ import (
 func RunSVGFontTask(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	target_fn := ""
+	html_preview_fn := ""
 	codepoint := rune(0xf000)
 	height := 512
 	var optDescent *int
@@ -39,6 +40,15 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 		case "target":
 			if s, ok := v.(string); ok && s != "" {
 				target_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+		case "html-preview":
+			if s, ok := v.(string); ok && s != "" {
+				html_preview_fn, err = prj.AbsPath(s)
 				if err != nil {
 					return fmt.Errorf("%s: %w", k, err)
 				}
@@ -165,6 +175,26 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 		fmt.Printf("SUCCEEDED\n")
 	} else {
 		fmt.Printf("FAILED\n")
+	}
+
+	if html_preview_fn != "" {
+		out.Reset()
+		fmt.Fprintf(&out, "<html><body><table>\n")
+		rel_base := filepath.Dir(html_preview_fn)
+		for _, g := range glyphs {
+			fn, _ := filepath.Rel(rel_base, g.FilePath)
+			fn = filepath.ToSlash(fn)
+			ident := MakeCPPIdentStr(g.Name)
+			fmt.Fprintf(&out, "  <tr><td><code>%s</code></td><td><img width='20pt' src='%s'/></td></tr>\n", ident, fn)
+		}
+		fmt.Fprintf(&out, "</table></body></html>\n")
+		fmt.Printf("- writing %s ... ", html_preview_fn)
+		err = os.WriteFile(html_preview_fn, out.Bytes(), 0666)
+		if err == nil {
+			fmt.Printf("SUCCEEDED\n")
+		} else {
+			fmt.Printf("FAILED\n")
+		}
 	}
 
 	return err
