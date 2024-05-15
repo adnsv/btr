@@ -257,28 +257,208 @@ func readSVGFileAsGlyph(fn string) (*Glyph, error) {
 		}
 	}
 
+	g.FilePath = fn
+	g.Width = w
+	g.Height = h
+
 	if len(sg.Items) == 0 {
-		g.FilePath = fn
-		g.Width = w
-		g.Height = h
 		g.Path = ""
 		g.Transform = nil
 		return g, nil
 	}
-	path, ok := sg.Items[0].(*svg.Path)
-	if !ok || path == nil {
-		return nil, fmt.Errorf("does not have path element")
-	}
 
-	g.FilePath = fn
-	g.Width = w
-	g.Height = h
-	g.Path = path.D
-	g.Transform = path.Transform
+	switch v := sg.Items[0].(type) {
+	case *svg.Path:
+		_, err = svg.ParsePath(g.Path)
+		if err != nil {
+			return nil, err
+		}
+		g.Path = v.D
+		g.Transform = v.Transform
 
-	_, err = svg.ParsePath(g.Path)
-	if err != nil {
-		return nil, err
+	case *svg.Polygon:
+		pp, err := svg.ParsePoints(v.Points)
+		if err != nil {
+			return nil, err
+		}
+		if len(pp) < 2 {
+			return nil, fmt.Errorf("empty polygon data")
+		}
+		d := svg.PathData{}
+		d.MoveTo(pp[0])
+		for _, p := range pp[1:] {
+			d.LineTo(p)
+		}
+		d.Close()
+		g.Path = d.String()
+		g.Transform = v.Transform
+
+	case *svg.Circle:
+		cx, err := lengthPixels(v.Cx, &g.Width)
+		if err != nil {
+			return nil, err
+		}
+		cy, err := lengthPixels(v.Cy, &g.Height)
+		if err != nil {
+			return nil, err
+		}
+		r := 1.0
+		if v.Radius != "" {
+			r, err = lengthPixels(v.Radius, &g.Width)
+			if err != nil {
+				return nil, err
+			}
+		}
+		k := 0.551784 * r
+		d := svg.PathData{}
+		d.MoveTo(svg.Vertex{X: cx - r, Y: cy})
+		d.CurveTo(
+			svg.Vertex{X: cx - r, Y: cy - k},
+			svg.Vertex{X: cx - k, Y: cy - r},
+			svg.Vertex{X: cx, Y: cy - r})
+		d.CurveTo(
+			svg.Vertex{X: cx + k, Y: cy - r},
+			svg.Vertex{X: cx + r, Y: cy - k},
+			svg.Vertex{X: cx + r, Y: cy})
+		d.CurveTo(
+			svg.Vertex{X: cx + r, Y: cy + k},
+			svg.Vertex{X: cx + k, Y: cy + r},
+			svg.Vertex{X: cx, Y: cy + r})
+		d.CurveTo(
+			svg.Vertex{X: cx - k, Y: cy + r},
+			svg.Vertex{X: cx - r, Y: cy + k},
+			svg.Vertex{X: cx - r, Y: cy})
+		d.Close()
+		g.Path = d.String()
+		g.Transform = v.Transform
+
+	case *svg.Ellipse:
+		cx, err := lengthPixels(v.Cx, &g.Width)
+		if err != nil {
+			return nil, err
+		}
+		cy, err := lengthPixels(v.Cy, &g.Height)
+		if err != nil {
+			return nil, err
+		}
+		rx, ry := 0.0, 0.0
+		if v.Rx != "" {
+			rx, err = lengthPixels(v.Rx, &g.Width)
+			if err != nil {
+				return nil, err
+			}
+			if v.Ry == "" {
+				ry = rx
+			}
+		}
+		if v.Ry != "" {
+			ry, err = lengthPixels(v.Ry, &g.Height)
+			if err != nil {
+				return nil, err
+			}
+			if v.Rx == "" {
+				rx = ry
+			}
+		}
+
+		kx := 0.551784 * rx
+		ky := 0.551784 * ry
+		d := svg.PathData{}
+		d.MoveTo(svg.Vertex{X: cx - rx, Y: cy})
+		d.CurveTo(
+			svg.Vertex{X: cx - rx, Y: cy - ky},
+			svg.Vertex{X: cx - kx, Y: cy - ry},
+			svg.Vertex{X: cx, Y: cy - ry})
+		d.CurveTo(
+			svg.Vertex{X: cx + kx, Y: cy - ry},
+			svg.Vertex{X: cx + rx, Y: cy - ky},
+			svg.Vertex{X: cx + rx, Y: cy})
+		d.CurveTo(
+			svg.Vertex{X: cx + rx, Y: cy + ky},
+			svg.Vertex{X: cx + kx, Y: cy + ry},
+			svg.Vertex{X: cx, Y: cy + ry})
+		d.CurveTo(
+			svg.Vertex{X: cx - kx, Y: cy + ry},
+			svg.Vertex{X: cx - rx, Y: cy + ky},
+			svg.Vertex{X: cx - rx, Y: cy})
+		d.Close()
+		g.Path = d.String()
+		g.Transform = v.Transform
+
+	case *svg.Rect:
+		x, err := lengthPixels(v.X, &g.Width)
+		if err != nil {
+			return nil, err
+		}
+		y, err := lengthPixels(v.Y, &g.Height)
+		if err != nil {
+			return nil, err
+		}
+		width, err := lengthPixels(v.Width, &g.Width)
+		if err != nil {
+			return nil, err
+		}
+		height, err := lengthPixels(v.Height, &g.Height)
+		if err != nil {
+			return nil, err
+		}
+
+		rx, ry := 0.0, 0.0
+		if v.Rx != "" {
+			rx, err = lengthPixels(v.Rx, &g.Width)
+			if err != nil {
+				return nil, err
+			}
+			if v.Ry == "" {
+				ry = rx
+			}
+		}
+		if v.Ry != "" {
+			ry, err = lengthPixels(v.Ry, &g.Height)
+			if err != nil {
+				return nil, err
+			}
+			if v.Rx == "" {
+				rx = ry
+			}
+		}
+
+		d := svg.PathData{}
+		if rx <= 0 || ry <= 0 {
+			d.MoveTo(svg.Vertex{X: x, Y: y})
+			d.LineTo(svg.Vertex{X: x + width, Y: y})
+			d.LineTo(svg.Vertex{X: x + width, Y: y + height})
+			d.LineTo(svg.Vertex{X: x, Y: y + height})
+			d.Close()
+		} else {
+			if rx > width*0.5 {
+				rx = width * 0.5
+			}
+			if ry > height*0.5 {
+				ry = height * 0.5
+			}
+
+			kx := (1.0 - 0.551784) * rx
+			ky := (1.0 - 0.551784) * ry
+
+			d.MoveTo(svg.Vertex{X: x + rx, Y: y})
+			d.LineTo(svg.Vertex{X: x + width - rx, Y: y})
+			d.LineTo(svg.Vertex{X: x + width - rx, Y: y})
+			d.CurveTo(svg.Vertex{X: x + width - kx, Y: y}, svg.Vertex{X: x + width, Y: y + ky}, svg.Vertex{X: x + width, Y: y + ry})
+			d.LineTo(svg.Vertex{X: x + width, Y: y + height - ry})
+			d.CurveTo(svg.Vertex{X: x + width, Y: y - ky}, svg.Vertex{X: x + width - kx, Y: y + height}, svg.Vertex{X: x + width - rx, Y: y + height})
+			d.LineTo(svg.Vertex{X: x + rx, Y: y + height})
+			d.CurveTo(svg.Vertex{X: x + kx, Y: y + height}, svg.Vertex{X: x, Y: y + height - ky}, svg.Vertex{X: x, Y: y + height - ry})
+			d.LineTo(svg.Vertex{X: x, Y: y + ry})
+			d.CurveTo(svg.Vertex{X: x, Y: y + ky}, svg.Vertex{X: x + kx, Y: y}, svg.Vertex{X: x + rx, Y: y})
+			d.Close()
+		}
+		d.Close()
+		g.Path = d.String()
+		g.Transform = v.Transform
+
+	default:
+		return nil, fmt.Errorf("unsupported SVG element")
 	}
 
 	return g, nil

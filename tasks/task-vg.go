@@ -241,7 +241,7 @@ func readSVGFile(fn string) (*VG, error) {
 	return vg, nil
 }
 
-func lengthPixels(vg *VG, l svg.Length, reflength *float64) (float64, error) {
+func lengthPixels(l svg.Length, reflength *float64) (float64, error) {
 	v, u, err := l.AsNumeric()
 	if err != nil {
 		return 0, err
@@ -333,26 +333,26 @@ func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
 		defer vg.PopID()
 	}
 
-	x, err := lengthPixels(vg, p.X, &vg.ViewBox.Width)
+	x, err := lengthPixels(p.X, &vg.ViewBox.Width)
 	if err != nil {
 		return err
 	}
-	y, err := lengthPixels(vg, p.Y, &vg.ViewBox.Height)
+	y, err := lengthPixels(p.Y, &vg.ViewBox.Height)
 	if err != nil {
 		return err
 	}
-	width, err := lengthPixels(vg, p.Width, &vg.ViewBox.Width)
+	width, err := lengthPixels(p.Width, &vg.ViewBox.Width)
 	if err != nil {
 		return err
 	}
-	height, err := lengthPixels(vg, p.Height, &vg.ViewBox.Height)
+	height, err := lengthPixels(p.Height, &vg.ViewBox.Height)
 	if err != nil {
 		return err
 	}
 
 	rx, ry := 0.0, 0.0
 	if p.Rx != "" {
-		rx, err = lengthPixels(vg, p.Rx, &width)
+		rx, err = lengthPixels(p.Rx, &width)
 		if err != nil {
 			return err
 		}
@@ -361,7 +361,7 @@ func readRect(vg *VG, p *svg.Rect, xform *svg.Transform) error {
 		}
 	}
 	if p.Ry != "" {
-		ry, err = lengthPixels(vg, p.Ry, &height)
+		ry, err = lengthPixels(p.Ry, &height)
 		if err != nil {
 			return err
 		}
@@ -411,17 +411,17 @@ func readCircle(vg *VG, p *svg.Circle, xform *svg.Transform) error {
 		defer vg.PopID()
 	}
 
-	cx, err := lengthPixels(vg, p.Cx, &vg.ViewBox.Width)
+	cx, err := lengthPixels(p.Cx, &vg.ViewBox.Width)
 	if err != nil {
 		return err
 	}
-	cy, err := lengthPixels(vg, p.Cy, &vg.ViewBox.Height)
+	cy, err := lengthPixels(p.Cy, &vg.ViewBox.Height)
 	if err != nil {
 		return err
 	}
 	r := 1.0
 	if p.Radius != "" {
-		r, err = lengthPixels(vg, p.Radius, &vg.ViewBox.Width)
+		r, err = lengthPixels(p.Radius, &vg.ViewBox.Width)
 		if err != nil {
 			return err
 		}
@@ -458,17 +458,17 @@ func readEllipse(vg *VG, p *svg.Ellipse, xform *svg.Transform) error {
 		defer vg.PopID()
 	}
 
-	cx, err := lengthPixels(vg, p.Cx, &vg.ViewBox.Width)
+	cx, err := lengthPixels(p.Cx, &vg.ViewBox.Width)
 	if err != nil {
 		return err
 	}
-	cy, err := lengthPixels(vg, p.Cy, &vg.ViewBox.Height)
+	cy, err := lengthPixels(p.Cy, &vg.ViewBox.Height)
 	if err != nil {
 		return err
 	}
 	rx, ry := 0.0, 0.0
 	if p.Rx != "" {
-		rx, err = lengthPixels(vg, p.Rx, &vg.ViewBox.Width)
+		rx, err = lengthPixels(p.Rx, &vg.ViewBox.Width)
 		if err != nil {
 			return err
 		}
@@ -477,7 +477,7 @@ func readEllipse(vg *VG, p *svg.Ellipse, xform *svg.Transform) error {
 		}
 	}
 	if p.Ry != "" {
-		ry, err = lengthPixels(vg, p.Ry, &vg.ViewBox.Height)
+		ry, err = lengthPixels(p.Ry, &vg.ViewBox.Height)
 		if err != nil {
 			return err
 		}
