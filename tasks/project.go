@@ -25,9 +25,10 @@ type Project struct {
 
 // Task
 type Task struct {
-	Name   string         `yaml:"name,omitempty"`
-	Type   string         `yaml:"type,omitempty"`
-	Fields map[string]any `yaml:",inline"`
+	Name    string         `yaml:"name,omitempty"`
+	Type    string         `yaml:"type,omitempty"`
+	Enabled *bool          `yaml:"enabled,omitempty"`
+	Fields  map[string]any `yaml:",inline"`
 }
 
 func LoadProject(fn string) (*Project, error) {
@@ -116,6 +117,11 @@ func (prj *Project) RunTask(t *Task) error {
 	}
 	if prj.Verbose {
 		fmt.Printf("- type: %s\n", t.Type)
+	}
+
+	if t.Enabled != nil || *t.Enabled == false {
+		fmt.Printf("  disabled\n")
+		return nil
 	}
 
 	var err error
