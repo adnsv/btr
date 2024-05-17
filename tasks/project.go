@@ -119,7 +119,7 @@ func (prj *Project) RunTask(t *Task) error {
 		fmt.Printf("- type: %s\n", t.Type)
 	}
 
-	if t.Enabled != nil || *t.Enabled == false {
+	if t.Enabled != nil || !*t.Enabled {
 		fmt.Printf("  disabled\n")
 		return nil
 	}
