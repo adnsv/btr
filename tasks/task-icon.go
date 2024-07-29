@@ -246,13 +246,12 @@ func codegenGLFWIcon(w io.Writer, pixmaps []*pixmapEntry) error {
 
 	{
 		fmt.Fprintf(w, `#elif defined(APPICON_SDL3)
-    auto surface = SDL_CreateSurfaceFrom(
-        const_cast<void*>(reinterpret_cast<void const*>(%s)),
-        %d, %d, %d * 4, SDL_PIXELFORMAT_ABGR8888);
+    auto surface = SDL_CreateSurfaceFrom(%d, %d, SDL_PIXELFORMAT_ABGR8888, 
+        const_cast<void*>(reinterpret_cast<void const*>(%s)), %d * 4);
     SDL_SetWindowIcon(static_cast<SDL_Window*>(native_window_handle), surface);
     SDL_DestroySurface(surface);
 
-`, largestPixmap.ident, largestPixmap.size.X, largestPixmap.size.Y, largestPixmap.size.X)
+`, largestPixmap.size.X, largestPixmap.size.Y, largestPixmap.ident, largestPixmap.size.X)
 	}
 
 	fmt.Fprint(w, "#endif\n")
