@@ -1,15 +1,13 @@
-github.com/adnsv/svg v0.0.3 h1:2XFN8JWCUZTXDOKlRWTX6CgXf2Bs4cSjfNQP1TOgYfI=
-github.com/adnsv/svg v0.0.3/go.mod h1:qgB4/HU8IuBWJrgWjEgbYlCNhb+kXSBj3S9BJ5NKmBY=
 github.com/adnsv/svg v0.0.4 h1:edxlx7rnnNG0ttblwjS7EdhFxTSerMbflt6iuEO+X2U=
 github.com/adnsv/svg v0.0.4/go.mod h1:qgB4/HU8IuBWJrgWjEgbYlCNhb+kXSBj3S9BJ5NKmBY=
+github.com/adnsv/vgr-tools v0.2.0 h1:70mhiv0CBgysNKVLJnuXR/8zd4hc1F3WEdydnRNv2U0=
+github.com/adnsv/vgr-tools v0.2.0/go.mod h1:GcmOLKtMvI3Jwa+xl/tRq3nFwkA3drVUKTyrJSlSxFc=
 github.com/adnsv/xmlgo v0.1.0 h1:obKZIWbt856qe43SpFcsVVLHbg+OwrBkQ7gqQq1aZFQ=
 github.com/adnsv/xmlgo v0.1.0/go.mod h1:7ye/nrnYdZ2hKbXFXI7Y4R03Fc0gAAh40u3wVS70ekI=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/bmatcuk/doublestar/v4 v4.6.1 h1:FH9SifrbvJhnlQpztAx++wlkk70QBf0iBWDwNy7PA4I=
 github.com/bmatcuk/doublestar/v4 v4.6.1/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
-golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8 h1:ESSUROHIBHg7USnszlcdmjBEwdMj9VUvU+OPk4yl2mc=
-golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8/go.mod h1:/lliqkxwWAhPjf5oSOIJup2XcqJaw8RGS6k3TGEc7GI=
 golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f h1:99ci1mjWVBWwJiEKYY6jWa4d2nTQVIEhZIptnrVb1XY=
 golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f/go.mod h1:/lliqkxwWAhPjf5oSOIJup2XcqJaw8RGS6k3TGEc7GI=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=

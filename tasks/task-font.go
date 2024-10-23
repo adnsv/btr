@@ -758,3 +758,22 @@ func parseCodepoint(s string) (rune, error) {
 	}
 	return rune(cp), nil
 }
+
+func lengthPixels(l svg.Length, reflength *float64) (float64, error) {
+	v, u, err := l.AsNumeric()
+	if err != nil {
+		return 0, err
+	}
+	switch u {
+	case svg.UnitNone, svg.UnitPX:
+		return v, nil
+	case svg.UnitPercent:
+		if reflength == nil {
+			return 0, fmt.Errorf("unsupported length percentage")
+		} else {
+			return *reflength * v / 100.0, nil
+		}
+	default:
+		return 0, fmt.Errorf("unsupported length units")
+	}
+}
