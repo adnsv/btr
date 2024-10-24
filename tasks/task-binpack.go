@@ -68,13 +68,7 @@ func RunBinpackTask(prj *Project, fields map[string]any) error {
 		filename := filepath.Base(source_fn)
 		ident_cpp := strings.ToLower(MakeCPPIdentStr(strings.ToLower(filename)))
 
-		bytestr := "    "
-		for i, b := range data {
-			if i > 0 && i%32 == 0 {
-				bytestr += "\n    "
-			}
-			bytestr += fmt.Sprintf("0x%.2x,", b)
-		}
+		bytestr := bytesToHexWrappedIndented(data)
 		blobs = append(blobs, &blobInfo{filename: filename, ident_cpp: ident_cpp, data: data, bytestr: bytestr})
 	}
 

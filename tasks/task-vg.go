@@ -95,7 +95,12 @@ func RunVGConvertTask(prj *Project, fields map[string]any) error {
 	rel_name, _ := filepath.Rel(filepath.Dir(cpp_fn), hpp_fn)
 
 	fmt.Fprintf(hpp_out, "#pragma once\n\n")
+	fmt.Fprintf(hpp_out, "// DO NOT EDIT: Generated file\n")
+	fmt.Fprintf(hpp_out, "// clang-format off\n\n")
 	fmt.Fprintf(hpp_out, "#include <array>\n\n")
+
+	fmt.Fprintf(cpp_out, "// DO NOT EDIT: Generated file\n")
+	fmt.Fprintf(cpp_out, "// clang-format off\n\n")
 	fmt.Fprintf(cpp_out, "#include %q\n\n", rel_name)
 
 	if namespace != "" {
@@ -139,13 +144,10 @@ func writeVG(hpp, cpp io.Writer, src *vgr.VG) {
 
 	ident := MakeCPPIdentStr(strings.ToLower(RemoveExtension(filepath.Base(src.Filename))))
 
-	bb := []string{}
-	for _, v := range buf {
-		bb = append(bb, fmt.Sprintf("0x%.2x", v))
-	}
+	bytestr := bytesToHexWrappedIndented(buf)
 
 	fmt.Fprintf(hpp, "extern const std::array<unsigned char, %d> %s;\n\n",
 		len(buf), ident)
 	fmt.Fprintf(cpp, "const std::array<unsigned char, %d> %s = {\n%s\n};\n\n",
-		len(buf), ident, CommaWrap(bb, "\t", 100))
+		len(buf), ident, bytestr)
 }

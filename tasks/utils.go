@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -213,4 +214,39 @@ func StringQWrap(s string, indent string, limit int) string {
 		ret += indent + fmt.Sprintf("%q", s)
 	}
 	return ret
+}
+
+func bytesToHexWrappedIndented(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+
+	// Pre-calculate the final string length to avoid reallocations
+	// For each byte we need: 2 chars for hex + 1 char for comma = 3 chars
+	// Plus we need a newline every 32 bytes
+	// Subtract 1 for the last comma we won't need
+	capacity := len(data)*3 + (len(data)-1)/32 - 1
+
+	var builder strings.Builder
+	builder.Grow(capacity)
+	builder.WriteString("    ")
+
+	// Lookup table for hex conversion - much faster than fmt.Sprintf
+	const hexChars = "0123456789abcdef"
+
+	for i, b := range data {
+		if i > 0 {
+			builder.WriteByte(',')
+			// Add newline after every 32 bytes
+			if i%32 == 0 {
+				builder.WriteString("\n    ")
+			}
+		}
+		builder.WriteByte('0')
+		builder.WriteByte('x')
+		builder.WriteByte(hexChars[b>>4])
+		builder.WriteByte(hexChars[b&0x0F])
+	}
+
+	return builder.String()
 }
