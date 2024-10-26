@@ -1,13 +1,36 @@
 package tasks
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"text/tabwriter"
 	"unicode"
 	"unicode/utf8"
 )
+
+func RemoveExtension(fn string) string {
+	ext := filepath.Ext(fn)
+	return fn[:len(fn)-len(ext)]
+}
+
+// ReplaceExtension replaces the extension of a filename with a new one.
+func ReplaceExtension(filename, newExt string) string {
+	if filename == "" {
+		return ""
+	}
+
+	// Get the base name without extension
+	base := filename
+	if ext := filepath.Ext(filename); ext != "" {
+		base = strings.TrimSuffix(filename, ext)
+	}
+
+	return base + newExt
+}
 
 var dollar_curly_re = regexp.MustCompile(`\$\{([_a-zA-Z][-_a-zA-Z0-9]*)\}`)
 
@@ -84,11 +107,6 @@ func identStart(c rune) bool {
 
 func identChar(c rune) bool {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'
-}
-
-func RemoveExtension(fn string) string {
-	ext := filepath.Ext(fn)
-	return fn[:len(fn)-len(ext)]
 }
 
 func MakeCPPIdentStr(s string) string {
@@ -249,4 +267,147 @@ func bytesToHexWrappedIndented(data []byte) string {
 	}
 
 	return builder.String()
+}
+
+// HppCppNs contains options for codegen of a c++ compilation unit.
+type HppCppNs struct {
+	HppTarget string // hpp filename
+	CppTarget string // cpp filename
+	Namespace string // namespace
+}
+
+func FetchCppTargetFields(prj *Project, fields map[string]any) (HppCppNs, error) {
+	ret := HppCppNs{}
+
+	var err error
+	for k, v := range fields {
+		switch k {
+
+		case "hpp-target":
+			ret.HppTarget, err = prj.GetString(v, true)
+			if err != nil {
+				return ret, fmt.Errorf("%s: %w", k, err)
+			}
+			if ret.HppTarget == "" {
+				return ret, fmt.Errorf("%s: empty value is not allowed", k)
+			}
+
+		case "cpp-target":
+			ret.CppTarget, err = prj.GetString(v, true)
+			if err != nil {
+				return ret, fmt.Errorf("%s: %w", k, err)
+			}
+			if ret.CppTarget == "" {
+				return ret, fmt.Errorf("%s: empty value is not allowed", k)
+			}
+
+		case "namespace":
+			ret.Namespace, err = prj.GetString(v, true)
+			if err != nil {
+				return ret, fmt.Errorf("%s: %w", k, err)
+			}
+		}
+	}
+
+	if ret.HppTarget == "" && ret.CppTarget == "" {
+		return ret, fmt.Errorf("missing fields: hpp-target and/or cpp-target")
+	}
+
+	if ret.HppTarget == "" {
+		// generate hpp name from cpp
+		ret.HppTarget = ReplaceExtension(ret.CppTarget, ".hpp")
+		if ret.CppTarget == ret.HppTarget {
+			return ret, fmt.Errorf("can't auto-generate hpp-target from cpp-target")
+		}
+	} else if ret.CppTarget == "" {
+		ret.CppTarget = ReplaceExtension(ret.HppTarget, ".cpp")
+		if ret.CppTarget == ret.HppTarget {
+			return ret, fmt.Errorf("can't auto-generate cpp-target from hpp-target")
+		}
+	} else if ret.CppTarget == ret.HppTarget {
+		return ret, fmt.Errorf("hpp-target must be different from cpp-target")
+	}
+
+	ret.HppTarget, err = prj.AbsPath(ret.HppTarget)
+	if err != nil {
+		return ret, err
+	}
+	ret.CppTarget, err = prj.AbsPath(ret.CppTarget)
+	if err != nil {
+		return ret, err
+	}
+
+	return ret, nil
+}
+
+type SourceFileWriter struct {
+	path      string
+	namespace string
+	t         *tabwriter.Writer
+	b         bytes.Buffer
+}
+
+func (w *SourceFileWriter) Write(p []byte) (n int, err error) {
+	return w.t.Write(p)
+}
+
+func (v *HppCppNs) MakeWriters() (hpp *SourceFileWriter, cpp *SourceFileWriter) {
+	hpp = &SourceFileWriter{}
+	hpp.path = v.HppTarget
+	hpp.namespace = v.Namespace
+	hpp.t = tabwriter.NewWriter(&hpp.b, 0, 4, 4, ' ', 0)
+	cpp = &SourceFileWriter{}
+	cpp.path = v.CppTarget
+	cpp.namespace = v.Namespace
+	cpp.t = tabwriter.NewWriter(&cpp.b, 0, 4, 4, ' ', 0)
+	return
+}
+
+func (v *HppCppNs) PutFileHeader(hpp *SourceFileWriter, cpp *SourceFileWriter) {
+	if hpp != nil {
+		fmt.Fprintf(hpp, "#pragma once\n\n")
+		fmt.Fprintf(hpp, "// DO NOT EDIT: Generated file\n")
+		fmt.Fprintf(hpp, "// clang-format off\n\n")
+	}
+
+	if cpp != nil {
+		fmt.Fprintf(cpp, "// DO NOT EDIT: Generated file\n")
+		fmt.Fprintf(cpp, "// clang-format off\n\n")
+	}
+}
+
+func (v *SourceFileWriter) StartNamespace() {
+	if v.namespace != "" {
+		fmt.Fprintf(v.t, "namespace %s {\n\n", v.namespace)
+	}
+}
+
+func (v *SourceFileWriter) DoneNamespace() {
+	if v.namespace != "" {
+		fmt.Fprintf(v.t, "} // namespace %s\n", v.namespace)
+	}
+}
+
+func (v *SourceFileWriter) WriteOutFile() error {
+	v.t.Flush()
+	fmt.Printf("- writing %s ... ", v.path)
+	err := os.WriteFile(v.path, v.b.Bytes(), 0666)
+	if err == nil {
+		fmt.Printf("SUCCEEDED\n")
+	} else {
+		fmt.Printf("FAILED\n")
+		return fmt.Errorf("when writing %s: %w", v.path, err)
+	}
+	return nil
+}
+
+func (v *SourceFileWriter) RelPathTo(other *SourceFileWriter) string {
+	if v == nil || other == nil {
+		return "#ERR"
+	}
+	rel, err := filepath.Rel(filepath.Dir(v.path), other.path)
+	if err != nil {
+		return "#ERR"
+	}
+	return rel
 }

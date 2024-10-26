@@ -133,7 +133,9 @@ func (prj *Project) RunTask(t *Task) error {
 	case "file":
 		err = RunFileTask(prj, t.Fields)
 	case "binpack":
-		err = RunBinpackTask(prj, t.Fields)
+		err = BinpackTask{}.Run(prj, t.Fields)
+	case "binpack-file":
+		err = BinpackFileTask{}.Run(prj, t.Fields)
 	case "svgfont":
 		err = RunSVGFontTask(prj, t.Fields)
 	case "ttf":
@@ -145,7 +147,7 @@ func (prj *Project) RunTask(t *Task) error {
 	case "win32-icon":
 		err = RunWin32IconTask(prj, t.Fields)
 	case "vg-convert":
-		err = RunVGConvertTask(prj, t.Fields)
+		err = VGConvertTask{}.Run(prj, t.Fields)
 
 	default:
 		log.Printf("unsupported type '%s'", t.Type)
@@ -315,6 +317,23 @@ func (prj *Project) GetStrings(v any) ([]string, error) {
 		}
 	} else {
 		return nil, errors.New("must be a string or an array of strings")
+	}
+	return ret, nil
+}
+
+func (prj *Project) GetString(v any, expandVariables bool) (string, error) {
+	ret := ""
+	var err error
+	if s, ok := v.(string); ok {
+		if expandVariables {
+			s, err = ExpandVariables(s, prj.Vars)
+			if err != nil {
+				return "", err
+			}
+		}
+		ret = s
+	} else {
+		return "", errors.New("must be a string or an array of strings")
 	}
 	return ret, nil
 }

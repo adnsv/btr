@@ -11,7 +11,123 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func RunBinpackTask(prj *Project, fields map[string]any) error {
+type BinpackFileTask struct {
+}
+
+func (BinpackFileTask) Run(prj *Project, fields map[string]any) error {
+	var source string
+	var err error
+
+	if v, ok := fields["source"]; ok {
+		source, err = prj.GetString(v, true)
+		if err != nil {
+			return fmt.Errorf("source field: %w", err)
+		}
+		if len(source) == 0 {
+			return fmt.Errorf("source field: must contain a filename")
+		}
+	} else {
+		return fmt.Errorf("missing field: source")
+	}
+
+	var ident string
+	if v, ok := fields["ident"]; ok {
+		ident, err = prj.GetString(v, true)
+		if err != nil {
+			return fmt.Errorf("ident field: %w", err)
+		}
+	}
+
+	var element_type string
+	if v, ok := fields["element-type"]; ok {
+		ident, err = prj.GetString(v, true)
+		if err != nil {
+			return fmt.Errorf("element-type field: %w", err)
+		}
+	}
+
+	source_fn, err := prj.AbsPath(source)
+	if err != nil {
+		return fmt.Errorf("source: %w", err)
+	} else if len(source_fn) == 0 {
+		return fmt.Errorf("missing source")
+	}
+
+	if ident == "" {
+		// automatically generate ident from filename
+		ident = strings.ToLower(MakeCPPIdentStr(strings.ToLower(filepath.Base(source_fn))))
+	}
+
+	if prj.Verbose {
+		fmt.Printf("- reading: %s\n", source_fn)
+	}
+	data, err := os.ReadFile(source_fn)
+	if err != nil {
+		return err
+	}
+	bytestr := bytesToHexWrappedIndented(data)
+
+	dst, err := FetchCppTargetFields(prj, fields)
+	if err != nil {
+		return err
+	}
+
+	hpp, cpp := dst.MakeWriters()
+
+	hpp_includes := []string{}
+	cpp_includes := []string{}
+
+	hpp_includes = append(hpp_includes, "<array>")
+	switch element_type {
+	case "":
+		element_type = "unsigned char"
+	case "std::size_t":
+		hpp_includes = append(hpp_includes, "<cstddef>")
+	case "std::byte":
+		hpp_includes = append(hpp_includes, "<cstddef>")
+	}
+
+	if element_type == "" {
+		element_type = "unsigned char"
+	}
+
+	cpp_includes = append(cpp_includes, "\""+cpp.RelPathTo(hpp)+"\"")
+
+	dst.PutFileHeader(hpp, cpp)
+
+	for _, v := range hpp_includes {
+		fmt.Fprintf(hpp, "#include %s\n", v)
+	}
+	fmt.Fprintf(hpp, "\n")
+
+	for _, v := range cpp_includes {
+		fmt.Fprintf(cpp, "#include %s\n", v)
+	}
+	fmt.Fprintf(cpp, "\n")
+
+	hpp.StartNamespace()
+	cpp.StartNamespace()
+
+	fmt.Fprintf(hpp, "extern const std::array<%s, %d> %s;\n\n", element_type, len(data), ident)
+
+	fmt.Fprintf(cpp, "const std::array<%s, %d> %s = {\n", element_type, len(data), ident)
+	fmt.Fprint(cpp, bytestr)
+	fmt.Fprintf(cpp, "};\n\n")
+
+	hpp.DoneNamespace()
+	cpp.DoneNamespace()
+
+	err = hpp.WriteOutFile()
+	if err != nil {
+		return err
+	}
+	return cpp.WriteOutFile()
+}
+
+type BinpackTask struct {
+}
+
+func (BinpackTask) Run(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	targets := []*Target{}
 	var err error
