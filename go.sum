@@ -1,7 +1,7 @@
 github.com/adnsv/svg v0.0.4 h1:edxlx7rnnNG0ttblwjS7EdhFxTSerMbflt6iuEO+X2U=
 github.com/adnsv/svg v0.0.4/go.mod h1:qgB4/HU8IuBWJrgWjEgbYlCNhb+kXSBj3S9BJ5NKmBY=
-github.com/adnsv/vgr-tools v0.2.0 h1:70mhiv0CBgysNKVLJnuXR/8zd4hc1F3WEdydnRNv2U0=
-github.com/adnsv/vgr-tools v0.2.0/go.mod h1:GcmOLKtMvI3Jwa+xl/tRq3nFwkA3drVUKTyrJSlSxFc=
+github.com/adnsv/vgr-tools v0.2.1-rc.1 h1:a/zTYuorxLKCTOq8WDm+Z6uTINCPXgu1jg6rkCa0ydI=
+github.com/adnsv/vgr-tools v0.2.1-rc.1/go.mod h1:GcmOLKtMvI3Jwa+xl/tRq3nFwkA3drVUKTyrJSlSxFc=
 github.com/adnsv/xmlgo v0.1.0 h1:obKZIWbt856qe43SpFcsVVLHbg+OwrBkQ7gqQq1aZFQ=
 github.com/adnsv/xmlgo v0.1.0/go.mod h1:7ye/nrnYdZ2hKbXFXI7Y4R03Fc0gAAh40u3wVS70ekI=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
