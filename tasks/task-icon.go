@@ -116,7 +116,10 @@ func loadPixmaps(source_fns []string) ([]*pixmapEntry, error) {
 	return pixmaps, nil
 }
 
-func RunEmbedIconTask(prj *Project, fields map[string]any) error {
+// Convert RunEmbedIconTask to struct
+type EmbedIconTask struct{}
+
+func (EmbedIconTask) Run(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	target_fn := ""
 
@@ -261,7 +264,10 @@ func codegenGLFWIcon(w io.Writer, pixmaps []*pixmapEntry) error {
 	return nil
 }
 
-func RunWin32IconTask(prj *Project, fields map[string]any) error {
+// Convert RunWin32IconTask to struct
+type Win32IconTask struct{}
+
+func (Win32IconTask) Run(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	target_fn := ""
 

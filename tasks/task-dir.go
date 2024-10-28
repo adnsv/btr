@@ -8,7 +8,10 @@ import (
 	"path/filepath"
 )
 
-func RunDirTask(prj *Project, fields map[string]any) error {
+// Convert RunDirTask to struct
+type DirTask struct{}
+
+func (DirTask) Run(prj *Project, fields map[string]any) error {
 	var path string
 	var varname string
 	if_missing := "create"

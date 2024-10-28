@@ -126,37 +126,37 @@ func (prj *Project) RunTask(t *Task) error {
 		return nil
 	}
 
-	var err error
+	var task interface {
+		Run(prj *Project, fields map[string]any) error
+	}
+
 	switch t.Type {
 	case "dir":
-		err = RunDirTask(prj, t.Fields)
+		task = DirTask{}
 	case "file":
-		err = RunFileTask(prj, t.Fields)
+		task = FileTask{}
 	case "binpack":
-		err = BinpackTask{}.Run(prj, t.Fields)
+		task = BinpackTask{}
 	case "binpack-file":
-		err = BinpackFileTask{}.Run(prj, t.Fields)
+		task = BinpackFileTask{}
 	case "svgfont":
-		err = RunSVGFontTask(prj, t.Fields)
+		task = SVGFontTask{}
 	case "ttf":
-		err = RunTTFTask(prj, t.Fields)
+		task = TTFTask{}
 	case "glyph-names":
-		err = RunGlyphNamesTask(prj, t.Fields)
+		task = GlyphNamesTask{}
 	case "embed-icon":
-		err = RunEmbedIconTask(prj, t.Fields)
+		task = EmbedIconTask{}
 	case "win32-icon":
-		err = RunWin32IconTask(prj, t.Fields)
+		task = Win32IconTask{}
 	case "vg-convert":
-		err = VGConvertTask{}.Run(prj, t.Fields)
-
+		task = VGConvertTask{}
 	default:
 		log.Printf("unsupported type '%s'", t.Type)
-	}
-	if err != nil {
-		return err
+		return nil
 	}
 
-	return nil
+	return task.Run(prj, t.Fields)
 }
 
 // AbsExistingPaths gets all the actual filepaths from sources, processes

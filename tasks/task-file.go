@@ -5,7 +5,10 @@ import (
 	"os"
 )
 
-func RunFileTask(prj *Project, fields map[string]any) error {
+// Convert RunFileTask to struct
+type FileTask struct{}
+
+func (FileTask) Run(prj *Project, fields map[string]any) error {
 	target_fn := ""
 	content := ""
 	var err error

@@ -19,7 +19,10 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func RunSVGFontTask(prj *Project, fields map[string]any) error {
+// Convert RunSVGFontTask to struct
+type SVGFontTask struct{}
+
+func (SVGFontTask) Run(prj *Project, fields map[string]any) error {
 	sources := []string{}
 	target_fn := ""
 	html_preview_fn := ""
@@ -198,6 +201,143 @@ func RunSVGFontTask(prj *Project, fields map[string]any) error {
 	}
 
 	return err
+}
+
+// Convert RunGlyphNamesTask to struct
+type GlyphNamesTask struct{}
+
+func (GlyphNamesTask) Run(prj *Project, fields map[string]any) error {
+	source_fn := ""
+	targets := []*Target{}
+
+	var err error
+	for k, v := range fields {
+		switch k {
+		case "source":
+			if s, ok := v.(string); ok && s != "" {
+				source_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+
+		case "target":
+			targets, err = prj.GetTargets(v)
+			if err != nil {
+				return fmt.Errorf("%s: %w", k, err)
+			}
+			if len(targets) == 0 {
+				return fmt.Errorf("%s: must not be empty", k)
+			}
+
+		default:
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
+		}
+	}
+
+	if source_fn == "" {
+		return fmt.Errorf("missing field: source")
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("missing field: target")
+	}
+
+	if prj.Verbose {
+		fmt.Printf("- reading: %s\n", source_fn)
+	}
+
+	glyphs, err := extractNamedCodepoints(source_fn)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range targets {
+		buf := bytes.Buffer{}
+		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
+		err = codegenGlyphNames(out, glyphs, maps.Clone(prj.Vars), t.Content, t.Entry)
+		if err != nil {
+			return err
+		}
+		out.Flush()
+
+		fmt.Printf("- writing %s ... ", t.File)
+		err = os.WriteFile(t.File, buf.Bytes(), 0666)
+		if err == nil {
+			fmt.Printf("SUCCEEDED\n")
+		} else {
+			fmt.Printf("FAILED\n")
+		}
+	}
+
+	return err
+}
+
+// Convert RunTTFTask to struct
+type TTFTask struct{}
+
+func (TTFTask) Run(prj *Project, fields map[string]any) error {
+	source_fn := ""
+	target_fn := ""
+
+	var err error
+	for k, v := range fields {
+		switch k {
+		case "source":
+			if s, ok := v.(string); ok && s != "" {
+				source_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("source: must be a non-empty string")
+			}
+
+		case "target":
+			if s, ok := v.(string); ok && s != "" {
+				target_fn, err = prj.AbsPath(s)
+				if err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			} else {
+				return fmt.Errorf("%s: must be a non-empty string", k)
+			}
+		default:
+			fmt.Printf("- WARNING: unknown field '%s'\n", k)
+		}
+	}
+
+	if source_fn == "" {
+		return fmt.Errorf("missing field: source")
+	}
+	if target_fn == "" {
+		return fmt.Errorf("missing field: target")
+	}
+
+	if prj.Verbose {
+		fmt.Printf("- source %q\n", source_fn)
+		fmt.Printf("- target %q\n", target_fn)
+	}
+
+	cmd := exec.Command("svg2ttf", "--version")
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to execute svg2ttf utility\n")
+		log.Printf("Please make sure it is installed:\n")
+		log.Printf("npm install -g svg2ttf\n")
+		log.Printf("you will need to have node.js installed\n")
+		return err
+	}
+	cmd = exec.Command("svg2ttf", source_fn, target_fn)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("svg2ttf: %w", err)
+	}
+
+	return nil
 }
 
 type Glyph struct {
@@ -512,74 +652,6 @@ func composeGlyphsIntoSVGFont(out io.Writer, glyphs []*Glyph,
 	return nil
 }
 
-func RunGlyphNamesTask(prj *Project, fields map[string]any) error {
-	source_fn := ""
-	targets := []*Target{}
-
-	var err error
-	for k, v := range fields {
-		switch k {
-		case "source":
-			if s, ok := v.(string); ok && s != "" {
-				source_fn, err = prj.AbsPath(s)
-				if err != nil {
-					return fmt.Errorf("%s: %w", k, err)
-				}
-			} else {
-				return fmt.Errorf("%s: must be a non-empty string", k)
-			}
-
-		case "target":
-			targets, err = prj.GetTargets(v)
-			if err != nil {
-				return fmt.Errorf("%s: %w", k, err)
-			}
-			if len(targets) == 0 {
-				return fmt.Errorf("%s: must not be empty", k)
-			}
-
-		default:
-			fmt.Printf("- WARNING: unknown field '%s'\n", k)
-		}
-	}
-
-	if source_fn == "" {
-		return fmt.Errorf("missing field: source")
-	}
-	if len(targets) == 0 {
-		return fmt.Errorf("missing field: target")
-	}
-
-	if prj.Verbose {
-		fmt.Printf("- reading: %s\n", source_fn)
-	}
-
-	glyphs, err := extractNamedCodepoints(source_fn)
-	if err != nil {
-		return err
-	}
-
-	for _, t := range targets {
-		buf := bytes.Buffer{}
-		out := tabwriter.NewWriter(&buf, 0, 4, 1, ' ', 0)
-		err = codegenGlyphNames(out, glyphs, maps.Clone(prj.Vars), t.Content, t.Entry)
-		if err != nil {
-			return err
-		}
-		out.Flush()
-
-		fmt.Printf("- writing %s ... ", t.File)
-		err = os.WriteFile(t.File, buf.Bytes(), 0666)
-		if err == nil {
-			fmt.Printf("SUCCEEDED\n")
-		} else {
-			fmt.Printf("FAILED\n")
-		}
-	}
-
-	return err
-}
-
 type NamedCodepoint struct {
 	Name    string `xml:"glyph-name,attr"`
 	Unicode string `xml:"unicode,attr"`
@@ -676,69 +748,6 @@ func codegenGlyphNames(out io.Writer, glyphs []*NamedCodepoint, globalVars map[s
 
 	_, err = out.Write([]byte(fileContent))
 	return err
-}
-
-func RunTTFTask(prj *Project, fields map[string]any) error {
-	source_fn := ""
-	target_fn := ""
-
-	var err error
-	for k, v := range fields {
-		switch k {
-		case "source":
-			if s, ok := v.(string); ok && s != "" {
-				source_fn, err = prj.AbsPath(s)
-				if err != nil {
-					return fmt.Errorf("%s: %w", k, err)
-				}
-			} else {
-				return fmt.Errorf("source: must be a non-empty string")
-			}
-
-		case "target":
-			if s, ok := v.(string); ok && s != "" {
-				target_fn, err = prj.AbsPath(s)
-				if err != nil {
-					return fmt.Errorf("%s: %w", k, err)
-				}
-			} else {
-				return fmt.Errorf("%s: must be a non-empty string", k)
-			}
-		default:
-			fmt.Printf("- WARNING: unknown field '%s'\n", k)
-		}
-	}
-
-	if source_fn == "" {
-		return fmt.Errorf("missing field: source")
-	}
-	if target_fn == "" {
-		return fmt.Errorf("missing field: target")
-	}
-
-	if prj.Verbose {
-		fmt.Printf("- source %q\n", source_fn)
-		fmt.Printf("- target %q\n", target_fn)
-	}
-
-	cmd := exec.Command("svg2ttf", "--version")
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("Failed to execute svg2ttf utility\n")
-		log.Printf("Please make sure it is installed:\n")
-		log.Printf("npm install -g svg2ttf\n")
-		log.Printf("you will need to have node.js installed\n")
-		return err
-	}
-	cmd = exec.Command("svg2ttf", source_fn, target_fn)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if err != nil {
-		return fmt.Errorf("svg2ttf: %w", err)
-	}
-
-	return nil
 }
 
 // parseCodepoint extracts unicode codepoint value from a string which can
