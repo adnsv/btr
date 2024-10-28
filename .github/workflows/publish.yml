@@ -3,31 +3,77 @@ name: Build and Publish Releases
 on:
   release:
     types: [created]
+  workflow_dispatch:    # Add manual trigger
+    inputs:            # Define inputs that will be shown in UI
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   releases-matrix:
     name: Release Binaries
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        goos: [linux, windows]
-        goarch: [amd64, arm64]
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
         
     steps:
-      - name: Version
-        run: echo APP_VERSION=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV}
-      
       - name: Checkout
-        uses: actions/checkout@v3      
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          cache: true
 
-      - name: Build
-        uses: wangyoucao577/go-release-action@v1.32
+      - name: Set Version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Use manually input version
+            echo "APP_VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          else
+            # Use release tag version (your current logic)
+            echo APP_VERSION=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV
+          fi
+
+      - name: Build and Upload
+        uses: wangyoucao577/go-release-action@v1.40
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          md5sum: false
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           project_path: "."
-          build_flags: -v
-          ldflags: -X "main.app_ver=${{ env.APP_VERSION }}"
+          binary_name: "btr"
+          build_flags: "-v -trimpath"
+          ldflags: >-
+            -s -w 
+            -X "main.version=${{ env.APP_VERSION }}"
+          md5sum: false
+          sha256sum: true
           compress_assets: zip
+          pre_command: export CGO_ENABLED=0
+          extra_files: LICENSE README.md
